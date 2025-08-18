@@ -1,0 +1,104 @@
+[
+  {
+    "filename": "IMG_20250804_134448.jpg",
+    "type": "image",
+    "path": "imgs_vids\\IMG_20250804_134448.jpg",
+    "coordinates": [
+      13.1983932,
+      47.3232501
+    ]
+  },
+  {
+    "filename": "IMG_20250804_142916.jpg",
+    "type": "image",
+    "path": "imgs_vids\\IMG_20250804_142916.jpg",
+    "coordinates": [
+      13.1991339,
+      47.3160131
+    ]
+  },
+  {
+    "filename": "VID_20250804_134454_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_134454_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_134556_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_134556_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_135724_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_135724_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_135944_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_135944_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_140224_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_140224_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_140343_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_140343_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_140538_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_140538_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_141049.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_141049.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_141514_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_141514_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_141952_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_141952_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_142442_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_142442_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_142922.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_142922.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_145012_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_145012_HLG.mp4",
+    "coordinates": null
+  },
+  {
+    "filename": "VID_20250804_145153_HLG.mp4",
+    "type": "video",
+    "path": "imgs_vids\\VID_20250804_145153_HLG.mp4",
+    "coordinates": null
+  }
+]
