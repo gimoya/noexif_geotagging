@@ -5,13 +5,14 @@ A Mapbox GL JS project that displays noexif geotagging media images and videos o
 ## Project Structure
 
 ```
-Video_Map_Fiddle/
-├── index.html              # Main HTML file
+noexif_geotagging/
+├── maptool.html            # Main geotagging tool (the actual application)
+├── index.html              # Simple guide and instructions
 ├── css/
 │   └── styles.css          # CSS styles for the map and markers
 ├── js/
 │   └── map.js              # JavaScript functionality
-├── imgs_vids/              # Folder containing for "noexif geotagging media" files
+├── example_media/          # Folder containing example media files
 ├── media_coordinates.json  # Generated file with media coordinates
 └── README.md               # This file
 ```
@@ -44,7 +45,8 @@ Video_Map_Fiddle/
    - Load GPX tracks to help with coordinate assignment
 
 4. **Run the Project**:
-   - Open `index.html` in a web browser
+   - Open `maptool.html` in a web browser (main application)
+   - Open `index.html` for a simple guide
    - Or serve the files using a local web server
 
 ## Media File Support

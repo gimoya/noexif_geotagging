@@ -1,0 +1,622 @@
+body { 
+    margin: 0; 
+    padding: 0; 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#map { 
+    position: absolute; 
+    top: 0; 
+    bottom: 0; 
+    width: 100%; 
+}
+
+/* Show panel button (always visible, positioned under panel) */
+.show-panel-btn {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 999; /* Below the panel */
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: block; /* Always visible */
+    opacity: 0; /* Start hidden */
+    pointer-events: none; /* Start non-interactive */
+}
+
+.show-panel-btn:hover {
+    background: #f8f9fa;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Control Panel Styles */
+#control-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: min(720px, 50vw);
+    height: 100vh;
+    background: white;
+    border-radius: 0;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    overflow: hidden;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Responsive design for portrait orientation */
+@media (orientation: portrait) {
+    #control-panel {
+        width: min(720px, 90vw);
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 0;
+    }
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px; /* Reduced from 15px to 8px */
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 0;
+}
+
+.panel-header h3 {
+    margin: 0 0 3px 0; /* Reduced from 5px to 3px */
+    font-size: 18.4px;
+    color: #333;
+}
+
+.panel-header .subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+    font-weight: normal;
+    line-height: 1.3;
+}
+
+#hide-panel {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+#hide-panel:hover {
+    color: #333;
+}
+
+.panel-content {
+    padding: 10px 20px; /* Match header horizontal padding (20px) */
+    height: calc(100vh - 53px); /* Adjusted from 60px due to reduced header padding */
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.search-section {
+    margin-bottom: 6px; /* Reduced from 10px */
+}
+
+.search-section h4 {
+    margin: 0 0 6px 0; /* Reduced from 10px */
+    font-size: 14px;
+    color: #333;
+}
+
+#geocoder-container {
+    width: 100%;
+    display: flex;
+    justify-content: stretch;
+}
+
+/* Ensure geocoder spans full width */
+#geocoder-container .mapboxgl-ctrl-geocoder {
+    flex: 1;
+    width: 100% !important;
+}
+
+/* Style the geocoder input */
+.mapboxgl-ctrl-geocoder {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 100% !important;
+}
+
+.mapboxgl-ctrl-geocoder input {
+    font-size: 14px;
+    padding: 6px 40px 6px 10px; /* Reduced padding from 8px to 6px, 12px to 10px */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.mapboxgl-ctrl-geocoder input:focus {
+    border-color: #2196f3;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+/* Position the search icon on the right */
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon {
+    position: absolute;
+    right: 8px;
+    left: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none; /* Prevent clicking on icon */
+}
+
+/* Hide the default left icon */
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon-search {
+    display: none;
+}
+
+/* Hide the clear button (X) */
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--button {
+    display: none !important;
+}
+
+.mode-selector {
+    margin-bottom: 8px; /* Reduced from 15px */
+    display: flex;
+    gap: 20px;
+}
+
+/* File input container */
+.file-input-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 8px; /* Reduced from 15px */
+    margin-top: 0;
+}
+
+.file-input-section {
+    flex: 1;
+}
+
+/* Hidden file inputs */
+#media-files-input,
+#gpx-file-input {
+    display: none;
+}
+
+/* Section divider */
+.section-divider {
+    margin: 8px 0; /* Reduced from 15px */
+    border: none;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* Popup styles */
+.popup-content {
+    padding: 8px;
+    max-width: 200px;
+}
+
+.popup-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.popup-coords {
+    font-size: 12px;
+    color: #666;
+}
+
+.media-popup-content {
+    padding: 10px;
+    max-width: 300px;
+}
+
+.mode-selector label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.mode-content {
+    margin-top: 0;
+}
+
+#view-mode {
+    display: none;
+}
+
+#file-list {
+    max-height: calc(100vh - 350px);
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    margin-bottom: 6px; /* Reduced from 10px */
+    position: relative; /* For tooltip positioning */
+}
+
+/* Enhanced tooltip for file list */
+#file-list:hover::after {
+    content: "Click on the map to set coordinates for media files";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1001;
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px; /* Reduced from 10px to 8px */
+    border-bottom: 1px solid #f1f3f4;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.file-item:hover {
+    background-color: #f8f9fa;
+}
+
+.file-item.selected {
+    background-color: #e3f2fd;
+    border-left: 3px solid #2196f3;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-thumbnail {
+    width: 180px;
+    height: 120px;
+    object-fit: contain;
+    border-radius: 6px;
+    border: 2px solid #ddd;
+    flex-shrink: 0;
+    background-color: #f5f5f5;
+}
+
+.video-thumbnail {
+    background: #4ecdc4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+}
+
+.file-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-type {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.coordinate-status {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.coordinate-status.has-coords {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.coordinate-status.no-coords {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+#media-stats {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+#media-stats p {
+    margin: 0;
+    font-size: 13px;
+    color: #495057;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* Download button styling */
+.download-btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: #fff;
+    border: none;
+}
+
+.download-btn:hover {
+    background: linear-gradient(135deg, #218838 0%, #17b07f 100%);
+}
+
+/* Specific styling for the large download button */
+#download-all-btn {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+    box-shadow: 0 6px 16px rgba(32, 201, 151, 0.25);
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+#download-all-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(32, 201, 151, 0.3);
+}
+
+#download-all-btn:active {
+    transform: translateY(0);
+}
+
+#download-all-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Media Marker Styles */
+.media-marker {
+    transition: transform 0.2s ease;
+}
+
+.media-marker:hover {
+    transform: scale(1.1);
+}
+
+/* Position Marker Styles */
+.position-marker {
+    transition: transform 0.2s ease;
+}
+
+.position-marker:hover {
+    transform: scale(1.1);
+}
+
+/* Marker Label Styles */
+.media-marker-label,
+.position-marker-label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Popup Elevation Style */
+.popup-elevation {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.mapboxgl-popup-content {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.mapboxgl-popup-close-button {
+    font-size: 18px;
+    color: #666;
+}
+
+.mapboxgl-popup-close-button:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+/* Click indicator */
+.click-indicator {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #2196f3;
+    border: 3px solid white;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1001;
+    animation: pulse 1s ease-out;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+/* Unified Activity Log - no header, taller */
+.unified-log {
+    max-height: 4em; 
+    overflow-y: auto;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 6px 8px; /* Slightly more padding for better readability */
+    margin-top: -7px; /* Moved 15px higher (from 8px to -7px) */
+    margin-bottom: 8px; /* Reduced from 15px */
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.unified-log-entry {
+    margin-bottom: 2px;
+    padding: 1px 0;
+    border-bottom: 1px solid #e0e0e0;
+    width: 100%;
+    word-wrap: break-word;
+    white-space: normal;
+    min-height: 1.3em; /* One line per entry */
+}
+
+.unified-log-entry:last-child {
+    border-bottom: none;
+}
+
+.unified-log-entry.success {
+    color: #28a745;
+}
+
+.unified-log-entry.info {
+    color: #17a2b8;
+}
+
+.unified-log-entry.warning {
+    color: #ffc107;
+}
+
+.unified-log-entry.error {
+    color: #dc3545;
+}
+
+/* Custom scrollbar for the unified log */
+.unified-log::-webkit-scrollbar {
+    width: 4px; /* Thinner scrollbar to save space */
+}
+
+.unified-log::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 2px;
+}
+
+.unified-log::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
+.unified-log::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* File Upload Styling - matching animated demo */
+.file-upload, .gpx-upload {
+    background: #fff;
+    border: 2px dashed #007bff;
+    border-radius: 8px;
+    padding: 3px; /* Reduced from 13px to 3px (10px less height) */
+    text-align: center;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.gpx-upload {
+    border-color: #28a745;
+}
+
+.file-upload:hover, .gpx-upload:hover {
+    background: #f8f9fa;
+    border-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.gpx-upload:hover {
+    border-color: #1e7e34;
+}
+
+.file-upload:active, .gpx-upload:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    background: #e9ecef;
+}
+
+.file-icon {
+    font-size: 1.95em; /* Increased from 1.5em to 1.95em (30% bigger) */
+    margin-bottom: 6px; /* Increased from 5px to 6px proportionally */
+    display: block;
+}
+
+.upload-text {
+    color: #007bff;
+    font-weight: 500;
+    font-size: 14px; /* Increased from 12px to 14px (17% bigger for better proportion) */
+}
+
+.gpx-upload .upload-text {
+    color: #28a745;
+}
+
+/* Drag-and-drop feedback */
+.file-upload.dragover, .gpx-upload.dragover {
+    background-color: #e6f7ff;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.gpx-upload.dragover {
+    background-color: #e8f5e8;
+    border-color: #28a745;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.25);
+}
+
+ 

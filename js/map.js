@@ -1,3 +1,5 @@
+
+
 // Mapbox access token
 mapboxgl.accessToken = 'pk.eyJ1IjoiZ2ltb3lhIiwiYSI6IkZrTld6NmcifQ.eY6Ymt2kVLvPQ6A2Dt9zAQ';
 
@@ -8,10 +10,10 @@ const ELEVATION_DISTANCE_THRESHOLD = 5; // 5 meters, for elevation lookup from G
 // Media files will be loaded dynamically from the file input
 let mediaFiles = [];
 
-// Initialize map with satellite imagery and labels
+// Initialize map with satellite streets style
 const map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/streets-v12',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
     center: [13.8, 47.6], // Center of Austria
     zoom: 8
 });
@@ -25,14 +27,41 @@ let gpxTrack = null; // Store GPX track data
 
 // Timezone offset constants (in milliseconds)
 const CEST_OFFSET_MS = 2 * 60 * 60 * 1000; // +2 hours for CEST
+
+// Centralized style objects for reuse
+const STYLE_GPX_LINE = {
+    layout: { 'line-join': 'round', 'line-cap': 'square' },
+    paint: {
+        'line-color': '#ff9800', // orange (Material Design Orange 500)
+        'line-width': 2,
+        'line-opacity': 1.0,
+        'line-blur': 0.5,
+        'line-dasharray': [1, 2]
+    }
+};
+
+const STYLE_MEDIA_MARKER = {
+    boxSizePx: 30,
+    fontSizePx: 25,
+    emojiImage: '📷',
+    emojiVideo: '🎥',
+    color: '#000000'
+};
+
+const STYLE_POSITION_MARKER = {
+    boxSizePx: 24,
+    fontSizePx: 18,
+    emoji: '✖',
+    color: '#ffffff'
+};
 function logActivity(message, type = 'info') {
     const logContainer = document.getElementById('unified-activity-log');
     if (!logContainer) return;
     
-    const timestamp = new Date().toLocaleTimeString();
     const logEntry = document.createElement('div');
     logEntry.className = `unified-log-entry ${type}`;
-    logEntry.innerHTML = `[${timestamp}] ${message}`;
+    // Display message as-is (avoid Date objects to prevent timezone shifts)
+    logEntry.innerHTML = `${message}`;
     
     logContainer.appendChild(logEntry);
     
@@ -62,6 +91,15 @@ function loadMediaFiles() {
     updateStats();
 }
 
+// Run auto-matching if we have both media and a GPX track
+function runAutoMatchingIfReady() {
+    if (gpxTrack && Array.isArray(mediaFiles) && mediaFiles.length > 0) {
+        autoAssignCoordinatesFromGpx(gpxTrack);
+    }
+}
+
+
+
 // Populate the file list in the control panel
 function populateFileList() {
     const fileList = document.getElementById('file-list');
@@ -76,23 +114,12 @@ function populateFileList() {
         const statusClass = hasCoords ? 'has-coords' : 'no-coords';
         const statusText = hasCoords ? 'Has Coords' : 'No Coords';
         
-        // Extract time directly from filename for display (bypass JavaScript timezone issues)
-        let dateStr = 'Unknown date';
-        if (file.dateTaken) {
-            // Extract YYYYMMDDHHMM from filename and format it nicely
-            const filename = file.filename;
-            const timeMatch = filename.match(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
-            if (timeMatch) {
-                const [_, year, month, day, hour, minute] = timeMatch;
-                dateStr = `${month}/${day}/${year} ${hour}:${minute}`;
-            } else {
-                // Fallback to JavaScript formatting
-                dateStr = file.dateTakenLocal ? file.dateTakenLocal.toLocaleDateString() + ' ' + file.dateTakenLocal.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unknown date';
-            }
-        }
+        // Display wall-time string derived directly from filename (no Date objects)
+        let dateStr = getWallTimeStringFromFilename(file.filename) || 'Unknown date';
         
         fileItem.innerHTML = `
             <div class="file-info">
+                <div class="file-id">${index + 1}</div>
                 ${file.type === 'image' ? `<img src="${file.path}" class="file-thumbnail" alt="${file.filename}">` : `<div class="file-thumbnail video-thumbnail">🎥</div>`}
                 <div class="file-details">
                     <div class="file-name">${file.filename}</div>
@@ -105,6 +132,41 @@ function populateFileList() {
         fileItem.addEventListener('click', () => selectFile(index));
         fileList.appendChild(fileItem);
     });
+}
+
+// Build a wall-time string directly from the filename tokens to avoid timezone shifts in UI
+function getWallTimeStringFromFilename(filename) {
+    // Order matters: more specific first
+    const patterns = [
+        // ISO with timezone present
+        /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})[Tt_ .-]?(\d{2})[:._-]?(\d{2})(?:[:._-]?(\d{2}))?\s*(Z|[+-]\d{2}(?::?\d{2})?)/,
+        // ISO-like separated
+        /(\d{4})[-_.](\d{2})[-_.](\d{2})[Tt_ .-](\d{2})[:._-](\d{2})(?:[:._-](\d{2}))?\b/,
+        // Compact with seconds
+        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})\b/,
+        // Compact without seconds
+        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})\b/,
+        // Date only
+        /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})\b/
+    ];
+    for (let i = 0; i < patterns.length; i++) {
+        const m = filename.match(patterns[i]);
+        if (!m) continue;
+        if (m.length >= 7 && (i === 0 || i === 1 || i === 2)) {
+            const year = m[1], month = m[2], day = m[3];
+            const hour = m[4], minute = m[5];
+            const second = m[6] || '00';
+            return `${day}/${month}/${year} ${hour}:${minute}`; // omit seconds for brevity
+        } else if (m.length === 6) { // compact without seconds
+            const year = m[1], month = m[2], day = m[3];
+            const hour = m[4], minute = m[5];
+            return `${day}/${month}/${year} ${hour}:${minute}`;
+        } else if (m.length === 4) { // date only
+            const year = m[1], month = m[2], day = m[3];
+            return `${day}/${month}/${year}`;
+        }
+    }
+    return null;
 }
 
 // Select a file for coordinate assignment
@@ -171,21 +233,37 @@ function setupEventListeners() {
     document.getElementById('hide-panel').addEventListener('click', hidePanel);
     document.getElementById('show-panel').addEventListener('click', showPanel);
     
-    // File input handlers
-    document.getElementById('select-files-btn').addEventListener('click', () => {
-        document.getElementById('media-files-input').click();
-    });
-    
+    // File input change handlers (keep existing functionality)
     document.getElementById('media-files-input').addEventListener('change', handleFileSelection);
-    
-    // GPX file handlers
-    document.getElementById('select-gpx-btn').addEventListener('click', () => {
-        document.getElementById('gpx-file-input').click();
-    });
-    
     document.getElementById('gpx-file-input').addEventListener('change', handleGpxSelection);
     
-    document.getElementById('clear-track-btn').addEventListener('click', clearGpxTrack);
+    // Make drop areas clickable and add drag & drop functionality
+    const mediaDropArea = document.querySelector('.file-upload');
+    const gpxDropArea = document.querySelector('.gpx-upload');
+    
+    // Make drop areas clickable (replacing button functionality)
+    mediaDropArea.addEventListener('click', () => document.getElementById('media-files-input').click());
+    gpxDropArea.addEventListener('click', () => document.getElementById('gpx-file-input').click());
+    
+    // Drag and drop functionality
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        mediaDropArea.addEventListener(eventName, preventDefaults, false);
+        gpxDropArea.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        mediaDropArea.addEventListener(eventName, () => mediaDropArea.classList.add('dragover'), false);
+        gpxDropArea.addEventListener(eventName, () => gpxDropArea.classList.add('dragover'), false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        mediaDropArea.addEventListener(eventName, () => mediaDropArea.classList.remove('dragover'), false);
+        gpxDropArea.addEventListener(eventName, () => gpxDropArea.classList.remove('dragover'), false);
+    });
+    
+    // Handle file drops
+    mediaDropArea.addEventListener('drop', handleMediaDrop, false);
+    gpxDropArea.addEventListener('drop', handleGpxDrop, false);
     
     // Bulk download button
     document.getElementById('download-all-btn').addEventListener('click', downloadAllNoexifGeotaggingMediaPhotos);
@@ -227,7 +305,7 @@ function handleMapClick(e) {
             }
         }
         
-        logActivity(`📍 Coordinates saved to "${filename}": ___${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}___${elevationInfo}`, 'success');
+        logActivity(`✖ Coordinates saved to "${filename}": ___${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}___${elevationInfo}`, 'success');
         
         // Update the file list to show new status
         updateFileStatus(selectedFileIndex);
@@ -264,13 +342,14 @@ function updatePositionMarker(fileIndex, coords) {
     // Create new position marker
     const markerEl = document.createElement('div');
     markerEl.className = 'position-marker';
-    markerEl.style.width = '28.5px';
-    markerEl.style.height = '28.5px';
+    markerEl.style.width = STYLE_POSITION_MARKER.boxSizePx + 'px';
+    markerEl.style.height = STYLE_POSITION_MARKER.boxSizePx + 'px';
     markerEl.style.cursor = 'pointer';
-    markerEl.style.fontSize = '22.8px';
+    markerEl.style.fontSize = STYLE_POSITION_MARKER.fontSizePx + 'px';
     markerEl.style.textAlign = 'center';
     markerEl.style.lineHeight = '28.5px';
-    markerEl.innerHTML = '📍';
+    markerEl.innerHTML = `${STYLE_POSITION_MARKER.emoji}<div style="position: absolute; top: -10px; right: -10px; background: #333; color: white; font-size: 12px; font-weight: bold; padding: 0; border-radius: 10px; min-width: 20px; text-align: center; line-height: 20px; z-index: 9999;">${fileIndex + 1}</div>`;
+    markerEl.style.color = STYLE_POSITION_MARKER.color;
     markerEl.title = `Position for ${mediaFiles[fileIndex].filename}`;
     
     // Create popup with file info
@@ -332,16 +411,17 @@ function showMediaPins() {
     
     mediaFiles.forEach((file, index) => {
         if (file.coordinates) {
-            // Create marker element
+            // Create marker element (use centralized style)
             const markerEl = document.createElement('div');
             markerEl.className = 'media-marker';
-            markerEl.style.width = '37.5px';
-            markerEl.style.height = '37.5px';
+            markerEl.style.width = STYLE_MEDIA_MARKER.boxSizePx + 'px';
+            markerEl.style.height = STYLE_MEDIA_MARKER.boxSizePx + 'px';
             markerEl.style.cursor = 'pointer';
-            markerEl.style.fontSize = '30px';
+            markerEl.style.fontSize = STYLE_MEDIA_MARKER.fontSizePx + 'px';
             markerEl.style.textAlign = 'center';
-            markerEl.style.lineHeight = '37.5px';
-            markerEl.innerHTML = file.type === 'image' ? '📷' : '🎥';
+            markerEl.style.lineHeight = STYLE_MEDIA_MARKER.boxSizePx + 'px';
+            markerEl.style.color = STYLE_MEDIA_MARKER.color;
+            markerEl.innerHTML = `${file.type === 'image' ? STYLE_MEDIA_MARKER.emojiImage : STYLE_MEDIA_MARKER.emojiVideo}<div style="position: absolute; top: -8px; right: -8px; background: #333; color: white; font-size: 10px; font-weight: bold; padding: 0; border-radius: 8px; min-width: 16px; text-align: center; line-height: 16px; z-index: 9999;">${index + 1}</div>`;
             markerEl.title = file.filename;
             
                          // Create popup content - clean image/video only
@@ -359,7 +439,19 @@ function showMediaPins() {
                  img.style.display = 'block';
                  img.style.margin = '0';
                  img.style.padding = '0';
+                 img.style.borderRadius = '0';
                  popupContent.appendChild(img);
+                 
+                 // Add filename below image
+                 const filenameDiv = document.createElement('div');
+                 filenameDiv.style.fontSize = '12px';
+                 filenameDiv.style.color = '#666';
+                 filenameDiv.style.textAlign = 'center';
+                 filenameDiv.style.padding = '8px';
+                 filenameDiv.style.fontWeight = '500';
+                 filenameDiv.style.backgroundColor = 'white';
+                 filenameDiv.textContent = file.filename;
+                 popupContent.appendChild(filenameDiv);
              } else {
                  const video = document.createElement('video');
                  video.src = file.path;
@@ -368,8 +460,20 @@ function showMediaPins() {
                  video.style.display = 'block';
                  video.style.margin = '0';
                  video.style.padding = '0';
+                 video.style.borderRadius = '0';
                  video.controls = true;
                  popupContent.appendChild(video);
+                 
+                 // Add filename below video
+                 const filenameDiv = document.createElement('div');
+                 filenameDiv.style.fontSize = '12px';
+                 filenameDiv.style.color = '#666';
+                 filenameDiv.style.textAlign = 'center';
+                 filenameDiv.style.padding = '8px';
+                 filenameDiv.style.fontWeight = '500';
+                 filenameDiv.style.backgroundColor = 'white';
+                 filenameDiv.textContent = file.filename;
+                 popupContent.appendChild(filenameDiv);
              }
              
              // Create custom close button (grey X)
@@ -420,13 +524,37 @@ function showMediaPins() {
     logActivity(`📷 Showing ${stats.filesWithCoordsCount} noexif geotagging media files on map`, 'info');
 }
 
-// Clear all media pins
-function clearMediaPins() {
-    mediaMarkers.forEach(marker => marker.remove());
-    mediaMarkers = [];
-    
-    // Show feedback
-    logActivity('🗑️ All media pins cleared', 'info');
+function computeCombinedBounds() {
+    const bounds = new mapboxgl.LngLatBounds();
+    let hasAny = false;
+    // GPX
+    if (gpxTrack && gpxTrack.tracks && gpxTrack.tracks[0] && Array.isArray(gpxTrack.tracks[0].points)) {
+        gpxTrack.tracks[0].points.forEach(p => {
+            if (p && typeof p.lon === 'number' && typeof p.lat === 'number') {
+                bounds.extend([p.lon, p.lat]);
+                hasAny = true;
+            }
+        });
+    }
+    // Media files with coordinates
+    mediaFiles.forEach(f => {
+        if (Array.isArray(f.coordinates) && f.coordinates.length === 2) {
+            bounds.extend(f.coordinates);
+            hasAny = true;
+        }
+    });
+    return hasAny ? bounds : null;
+}
+
+// Update map bounds to include all media files and GPX data
+function updateMapBounds() {
+    const bounds = computeCombinedBounds();
+    if (bounds) {
+        map.fitBounds(bounds, {
+            padding: 50,
+            duration: 1000
+        });
+    }
 }
 
 // Hide all media pins (for mode switching)
@@ -443,12 +571,29 @@ function clearPositionMarkers() {
     positionMarkers = [];
 }
 
+// Refresh the entire map view by updating all markers
+function refreshMapView() {
+    if (currentMode === 'assign') {
+        // Assign mode: show position markers (crosses), hide media pins
+        showPositionMarkers();
+        hideMediaPins();
+    } else {
+        // View mode: show media pins, hide position markers
+        showMediaPins();
+        hidePositionMarkers();
+    }
+}
+
 // Show all position markers (normal pins)
 function showPositionMarkers() {
     // Only show position markers if in assign mode
     if (currentMode === 'assign') {
+        // Clear existing markers first to ensure proper updates
+        hidePositionMarkers();
+        
+        // Create/update markers for all files with coordinates
         mediaFiles.forEach((mediaFile, index) => {
-            if (mediaFile.coordinates && !positionMarkers[index]) {
+            if (mediaFile.coordinates) {
                 updatePositionMarker(index, mediaFile.coordinates);
             }
         });
@@ -482,6 +627,8 @@ function calculateMediaStats() {
     };
 }
 
+
+
 // Update statistics display
 function updateStats() {
     const stats = calculateMediaStats();
@@ -502,22 +649,34 @@ function handleFileSelection(event) {
         
         if (!isImage && !isVideo) return null;
         
-        // Keep date extraction for GPX auto-assignment, but don't rely on it for sorting
-        let dateTaken = extractDateFromFilename(file.name);
-        if (!dateTaken) {
-            dateTaken = new Date(file.lastModified);
+        // Parse date using shared filename date parser
+        let dateTaken = FilenameDateParser.parse(file.name);
+        let dateSource = 'filename';
+        
+        if (!dateTaken && file.datetaken) {
+            dateTaken = new Date(file.datetaken);
+            dateSource = 'EXIF';
         }
         
-        return {
+        // Log what we found or didn't find
+        if (dateTaken) {
+            const dateStr = dateTaken.toISOString().slice(0, 19).replace('T', ' ');
+            logActivity(`📅 ${file.name}: date found from ${dateSource} - ${dateStr}`, 'info');
+        } else {
+            logActivity(`⚠️ ${file.name}: no date found - will be available for manual coordinate assignment only`, 'warning');
+        }
+        
+        const entry = {
             filename: file.name,
             type: isImage ? 'image' : 'video',
             path: URL.createObjectURL(file),
             coordinates: null,
             elevation: null,              // Elevation from GPX (null for manual assignment)
             file: file,
-            dateTaken: dateTaken,        // UTC time for GPX matching
+            dateTaken: dateTaken,        // UTC time for GPX matching (null for manual assignment)
             dateTakenLocal: dateTaken ? new Date(dateTaken.getTime() + CEST_OFFSET_MS) : null  // Local time for display
         };
+        return entry;
     })).then(fileData => {
         mediaFiles = fileData.filter(file => file !== null);
         
@@ -527,31 +686,50 @@ function handleFileSelection(event) {
         const stats = calculateMediaStats();
         updateStats();
         logActivity(`📁 Loaded ${stats.totalFiles} files (${stats.imageCount} images, ${stats.videoCount} videos)`, 'info');
+
+        // Trigger auto-matching if GPX is present
+        if (gpxTrack) {
+            logActivity(`🎯 GPX track detected - triggering auto-matching for ${stats.totalFiles} files`, 'info');
+        }
+        runAutoMatchingIfReady();
+        
+        // Refresh map view to show updated markers
+        refreshMapView();
     });
 }
 
-// Helper function to convert local time to UTC (simple -2 hours for CEST)
-function localTimeToUTC(year, month, day, hour = 0, minute = 0, second = 0) {
-    // Simple: subtract 2 hours for CEST (UTC+2)
-    const utcHour = hour - 2;
-    return new Date(Date.UTC(year, month - 1, day, utcHour, minute, second));
-}
+// (no-op) local time conversion is handled by shared parser + CEST offset application above
 
 // Helper function to format time range for display
 function formatTimeRange(startTime, endTime) {
-    const startDate = startTime.toLocaleDateString();
-    const startTimeStr = startTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-    const endDate = endTime.toLocaleDateString();
-    const endTimeStr = endTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-    
-    if (startDate === endDate) {
-        // Same date: show "Date HH:MM - HH:MM"
-        return `${startDate} ${startTimeStr} - ${endTimeStr}`;
-    } else {
-        // Different dates: show "Date1 HH:MM - Date2 HH:MM"
-        return `${startDate} ${startTimeStr} - ${endDate} ${endTimeStr}`;
+    // Use ISO strings converted to wall strings without constructing new Date objects for UI
+    const startStr = isoToWallString(typeof startTime === 'string' ? startTime : startTime.toISOString());
+    const endStr = isoToWallString(typeof endTime === 'string' ? endTime : endTime.toISOString());
+    const sameDay = startStr.split(' ')[0] === endStr.split(' ')[0];
+    return sameDay ? `${startStr} - ${endStr.split(' ')[1]}` : `${startStr} - ${endStr}`;
+}
+
+// Convert ISO string like 2025-08-04T13:27:44Z into dd/mm/yyyy HH:MM (wall time from tokens)
+function isoToWallString(iso) {
+    // Convert ISO (UTC) to local wall time string using fixed project offset (CEST)
+    try {
+        const utc = new Date(iso);
+        if (isNaN(utc.getTime())) return iso;
+        const localMs = utc.getTime() + CEST_OFFSET_MS;
+        const adj = new Date(localMs);
+        const pad = (n) => n.toString().padStart(2, '0');
+        const day = pad(adj.getUTCDate());
+        const month = pad(adj.getUTCMonth() + 1);
+        const year = adj.getUTCFullYear();
+        const hour = pad(adj.getUTCMinutes() >= 0 ? adj.getUTCHours() : adj.getUTCHours());
+        const minute = pad(adj.getUTCMinutes());
+        return `${day}/${month}/${year} ${hour}:${minute}`;
+    } catch (e) {
+        return iso;
     }
 }
+
+
 
 // Helper function to find nearest GPX track point and extract elevation
 // Uses ELEVATION_DISTANCE_THRESHOLD global constant (default: 5 meters)
@@ -606,41 +784,7 @@ function findNearestGpxElevation(coordinates, thresholdMeters = ELEVATION_DISTAN
     }
 }
 
-// Extract date from filename using regex patterns
-function extractDateFromFilename(filename) {
-    // Common filename patterns for date extraction
-    // Order matters! More specific patterns first, then more general ones
-    const patterns = [
-        // YYYYMMDDHHMM format (e.g., 202508041200) - NO SECONDS, LOCAL TIME
-        /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/,
-        // YYYYMMDD format (e.g., 20250804) - fallback
-        /(\d{4})(\d{2})(\d{2})/
-    ];
-    
-    for (const pattern of patterns) {
-        const match = filename.match(pattern);
-        if (match) {
-            try {
-                if (match.length === 6) {
-                    // YYYYMMDDHHMM format (e.g., 202508041200) - NO SECONDS, LOCAL TIME
-                    const [_, year, month, day, hour, minute] = match;
-                    const utcDate = localTimeToUTC(year, month, day, hour, minute, 0);
-                    console.log(`Timezone conversion for ${filename}: Local ${year}-${month}-${day} ${hour}:${minute}:00 → UTC ${utcDate.toISOString()}`);
-                    return utcDate;
-                } else if (match.length === 4) {
-                    // Date only: YYYY, MM, DD
-                    const [_, year, month, day] = match;
-                    return localTimeToUTC(year, month, day, 0, 0, 0);
-                }
-            } catch (error) {
-                // Invalid date, try next pattern
-                continue;
-            }
-        }
-    }
-    
-    return null; // No date found
-}
+// Filename date parsing moved to shared module: js/filename-date-parser.js
 
 // Handle GPX file selection
 function handleGpxSelection(event) {
@@ -657,46 +801,50 @@ function handleGpxSelection(event) {
                 gpxTrack = gpxData;
                 displayGpxTrack(gpxData);
                 
-                // Auto-assign coordinates based on timestamp matching
-                autoAssignCoordinatesFromGpx(gpxData);
+                // Auto-assign coordinates based on timestamp matching (now centralized)
+                runAutoMatchingIfReady();
                 
-                document.getElementById('clear-track-btn').style.display = 'inline-block';
+                // Update map bounds to include GPX track
+                updateMapBounds();
+                
+                // Refresh map view to show updated markers
+                refreshMapView();
                 
                 // Show feedback with more detailed info
                 const trackName = gpxData.tracks[0].name || 'Unnamed track';
                 logActivity(`🗺️ GPX track loaded: ${trackName} (${gpxData.tracks[0].points.length} points)`, 'info');
                 
-                // Debug: Show first and last timestamps from GPX
+                // Debug: Show first and last timestamps from GPX (string-based to avoid timezone shifts)
                 const pointsWithTime = gpxData.tracks[0].points.filter(p => p.time);
                 if (pointsWithTime.length > 0) {
-                    const firstTime = new Date(pointsWithTime[0].time);
-                    const lastTime = new Date(pointsWithTime[pointsWithTime.length - 1].time);
-                    
-                    // Format time range for display (date, hours, minutes)
-                    const timeRangeStr = formatTimeRange(firstTime, lastTime);
-                    
-                    // Log to console for debug
-                    console.log(`🗺️ GPX time range: ${firstTime.toISOString()} to ${lastTime.toISOString()}`);
-                    console.log(`🗺️ GPX time range local: ${firstTime.toString()} to ${lastTime.toString()}`);
-                    
-                    // Display in UI
+                    const firstIso = pointsWithTime[0].time;
+                    const lastIso = pointsWithTime[pointsWithTime.length - 1].time;
+                    const firstStr = isoToWallString(firstIso);
+                    const lastStr = isoToWallString(lastIso);
+                    const sameDay = firstStr.split(' ')[0] === lastStr.split(' ')[0];
+                    const timeRangeStr = sameDay ? `${firstStr} - ${lastStr.split(' ')[1]}` : `${firstStr} - ${lastStr}`;
                     logActivity(`⏰ Track time range: ${timeRangeStr}`, 'info');
                 }
-
-                    } else {
+            } else {
                 throw new Error('No tracks found in GPX file');
-                    }
-            } catch (error) {
+            }
+        } catch (error) {
             logActivity(`❌ Error loading GPX file: ${error.message}`, 'warning');
         }
     };
     
     reader.readAsText(file);
+    
+    // Clear the file input value so the same file can be selected again
+    // This fixes the browser limitation where change event doesn't fire for same file
+    event.target.value = '';
 }
 
 // Auto-assign coordinates from GPX track based on timestamp matching
 function autoAssignCoordinatesFromGpx(gpxData) {
-    if (!gpxData.tracks || gpxData.tracks.length === 0) return;
+    if (!gpxData.tracks || gpxData.tracks.length === 0) {
+        return;
+    }
     
     const trackPoints = gpxData.tracks[0].points;
     let assignedCount = 0;
@@ -713,23 +861,14 @@ function autoAssignCoordinatesFromGpx(gpxData) {
     
     // Process each media file
     mediaFiles.forEach((mediaFile, index) => {
-        if (mediaFile.coordinates !== null) {
-            // Skip files that already have coordinates
-            return;
-        }
+
         
         if (!mediaFile.dateTaken) {
             // Skip files without dates
             return;
         }
         
-        // Debug: Log the media file date being processed
-        console.log(`Processing ${mediaFile.filename}:`, {
-            extractedDate: mediaFile.dateTaken,
-            extractedDateString: mediaFile.dateTaken.toISOString(),
-            extractedDateLocal: mediaFile.dateTaken.toString(),
-            extractedDateUTC: mediaFile.dateTaken.toISOString()
-        });
+
         
         // Find the closest matching track point by time
         const result = findClosestTrackPointByTime(mediaFile.dateTaken, pointsWithTime);
@@ -743,11 +882,16 @@ function autoAssignCoordinatesFromGpx(gpxData) {
             // Log each assignment (now showing seconds instead of minutes)
             const timeDiff = Math.abs(mediaFile.dateTaken - new Date(result.point.time)) / 1000; // seconds
             const elevationInfo = result.point.elevation ? ` at ${result.point.elevation}m` : '';
-            logActivity(`📍 Auto-assigned coords to ${mediaFile.filename} (${timeDiff.toFixed(1)}s diff)${elevationInfo}`, 'success');
+            logActivity(`✖ Auto-assigned coords to ${mediaFile.filename} (${timeDiff.toFixed(1)}s diff)${elevationInfo}`, 'success');
         } else if (result && result.reason === 'date_mismatch') {
             dateMismatchCount++;
+            logActivity(`⚠️ ${mediaFile.filename}: date mismatch with GPX track`, 'warning');
         } else if (result && result.reason === 'time_threshold') {
             timeThresholdCount++;
+            logActivity(`⚠️ ${mediaFile.filename}: time difference exceeds ${GPX_TIME_THRESHOLD}s threshold`, 'warning');
+        } else if (result && result.reason === 'no_match') {
+            const mediaDateStr = mediaFile.dateTaken.toISOString().slice(0, 19).replace('T', ' ');
+            logActivity(`ℹ️ ${mediaFile.filename}: no matching GPX track point found (media date: ${mediaDateStr})`, 'info');
         }
     });
     
@@ -763,9 +907,13 @@ function autoAssignCoordinatesFromGpx(gpxData) {
             }
         });
         
-        logActivity(`🎯 Auto-assigned coordinates to ${assignedCount} media files from GPX track`, 'success');
-    } else {
-        logActivity('ℹ️ No coordinates auto-assigned - check that media files have dates and GPX has timestamps', 'info');
+        logActivity(`🎯 Auto-assigned coordinates to ${assignedCount} media files from GPX track (overwrote existing coordinates where applicable)`, 'success');
+        
+        // Update map bounds to include newly assigned coordinates
+        updateMapBounds();
+        
+        // Refresh map view to show updated markers
+        refreshMapView();
     }
     
     // Log exclusions
@@ -782,28 +930,21 @@ function findClosestTrackPointByTime(mediaDate, trackPoints) {
     let closestPoint = null;
     let smallestDiff = Infinity;
     
-    console.log(`\n🔍 Finding closest track point for media date: ${mediaDate.toISOString()}`);
-    console.log(`📅 Media date local: ${mediaDate.toString()}`);
+
     
     trackPoints.forEach((point, index) => {
         if (!point.time) return;
         
         const trackTime = new Date(point.time);
         
-        // Debug: Log first few track points to see their timestamps
-        if (index < 5) {
-            console.log(`Track point ${index}: ${point.time} -> ${trackTime.toISOString()}`);
-        }
+
         
         // Check if dates are different (different calendar days)
         const mediaDateOnly = new Date(mediaDate.getFullYear(), mediaDate.getMonth(), mediaDate.getDate());
-        const trackDateOnly = new Date(trackTime.getFullYear(), trackTime.getMonth(), trackTime.getDate());
+        const trackDateOnly = new Date(trackTime.getUTCFullYear(), trackTime.getUTCMonth(), trackTime.getUTCDate());
         
         if (mediaDateOnly.getTime() !== trackDateOnly.getTime()) {
             // Different dates - exclude this point
-            if (index < 5) {
-                console.log(`❌ Date mismatch: Media ${mediaDateOnly.toISOString()} vs Track ${trackDateOnly.toISOString()}`);
-            }
             return;
         }
         
@@ -814,9 +955,7 @@ function findClosestTrackPointByTime(mediaDate, trackPoints) {
         
         const timeDiff = Math.abs(mediaTimeUTC - trackTimeUTC);
         
-        if (index < 5) {
-            console.log(`⏰ Time comparison: Media UTC ${mediaTimeUTC} vs Track UTC ${trackTimeUTC}, diff: ${timeDiff}ms (${(timeDiff/1000).toFixed(1)}s)`);
-        }
+
         
         if (timeDiff < smallestDiff) {
             smallestDiff = timeDiff;
@@ -892,7 +1031,7 @@ function parseGpx(gpxText) {
 
 // Display GPX track on the map
 function displayGpxTrack(gpxData) {
-    // Remove existing track if any
+    // Remove existing track if any (automatic overwrite)
     if (map.getSource('gpx-track')) {
         map.removeLayer('gpx-track-layer');
         map.removeSource('gpx-track');
@@ -916,50 +1055,17 @@ function displayGpxTrack(gpxData) {
         }
     });
     
-    // Add track layer
+    // Add track layer using centralized style
     map.addLayer({
         id: 'gpx-track-layer',
         type: 'line',
         source: 'gpx-track',
-        layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-        },
-        paint: {
-            'line-color': '#ff6b6b',
-            'line-width': 4,
-            'line-opacity': 0.8
-        }
+        layout: STYLE_GPX_LINE.layout,
+        paint: STYLE_GPX_LINE.paint
     });
     
-    // Fit map to track bounds
-    const bounds = coordinates.reduce((bounds, coord) => {
-        return bounds.extend(coord);
-    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-    
-    map.fitBounds(bounds, {
-        padding: 50,
-        duration: 1000
-    });
-}
-
-// Clear GPX track from map
-function clearGpxTrack() {
-    if (map.getSource('gpx-track')) {
-        map.removeLayer('gpx-track-layer');
-        map.removeSource('gpx-track');
-    }
-    
-    gpxTrack = null;
-    // Remove reference to deleted gpx-info div
-    document.getElementById('clear-track-btn').style.display = 'none';
-    document.getElementById('gpx-file-input').value = '';
-    
-    // Show feedback
-    logActivity('🗺️ GPX track cleared', 'info');
-    
-    // Update stats since GPX track affects elevation data
-    updateStats();
+    // Update map bounds to include both GPX track and media files
+    updateMapBounds();
 }
 
 // Hide control panel
@@ -988,29 +1094,7 @@ function showPanel() {
     panel.style.transform = 'translate(0, 0)';
 }
 
-// Add satellite imagery as an overlay when map loads
-map.on('load', () => {
-    // Add satellite imagery as a raster layer with reduced opacity
-    map.addSource('satellite-overlay', {
-        type: 'raster',
-        url: 'mapbox://mapbox.satellite',
-        tiles: ['https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.png?access_token=' + mapboxgl.accessToken]
-    });
-    
-    // Insert satellite overlay before the first label layer to keep labels on top
-    const firstLabelLayer = map.getStyle().layers.find(layer => 
-        layer.type === 'symbol' && layer.id.includes('label')
-    );
-    
-    map.addLayer({
-        id: 'satellite-overlay',
-        type: 'raster',
-        source: 'satellite-overlay',
-        paint: {
-            'raster-opacity': 0.5 // 30% opacity = 70% transparent
-        }
-    }, firstLabelLayer ? firstLabelLayer.id : undefined);
-});
+
 
 // Add map controls
 map.addControl(new mapboxgl.FullscreenControl());
@@ -1024,7 +1108,7 @@ const geocoder = new MapboxGeocoder({
     accessToken: mapboxgl.accessToken,
     mapboxgl: mapboxgl,
     placeholder: 'Search for a location...',
-    countries: 'at', // Limit to Austria
+    countries: null, // Global search (no country restriction)
     language: 'en',
     marker: false, // Don't add a marker when searching
     flyTo: {
@@ -1054,6 +1138,17 @@ async function downloadAllNoexifGeotaggingMediaPhotos() {
     try {
         const zip = new JSZip();
         let processedCount = 0;
+        
+        // Add map screenshot if available
+        try {
+            const mapScreenshot = await captureMapScreenshot();
+            if (mapScreenshot) {
+                zip.file('map_overview.jpg', mapScreenshot);
+            }
+        } catch (error) {
+            console.log('Map screenshot failed:', error);
+        }
+
         
         // Process each image with coordinates
         for (const file of filesWithCoords) {
@@ -1182,5 +1277,322 @@ async function addGpsToJpegBlob(blob, coords) {
     return blob;
 }
 
+// Prevent default drag and drop behavior
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+// Handle media file drop
+function handleMediaDrop(e) {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    Promise.all(files.map(async file => {
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        
+        if (!isImage && !isVideo) return null;
+        
+        // Keep date extraction for GPX auto-assignment, but don't rely on it for sorting
+        let dateTaken = FilenameDateParser.parse(file.name);
+        let dateSource = 'filename';
+        
+        if (!dateTaken && file.datetaken) {
+            dateTaken = new Date(file.datetaken);
+            dateSource = 'EXIF';
+        }
+        
+        // Log what we found or didn't find
+        if (dateTaken) {
+            const dateStr = dateTaken.toISOString().slice(0, 19).replace('T', ' ');
+            logActivity(`📅 ${file.name}: date found from ${dateSource} - ${dateStr}`, 'info');
+        } else {
+            logActivity(`⚠️ ${file.name}: no date found - will be available for manual coordinate assignment only`, 'warning');
+        }
+        
+        const entry = {
+            filename: file.name,
+            type: isImage ? 'image' : 'video',
+            path: URL.createObjectURL(file),
+            coordinates: null,
+            elevation: null,              // Elevation from GPX (null for manual assignment)
+            file: file,
+            dateTaken: dateTaken,        // UTC time for GPX matching (null for manual assignment)
+            dateTakenLocal: dateTaken ? new Date(dateTaken.getTime() + CEST_OFFSET_MS) : null  // Local time for display
+        };
+        return entry;
+    })).then(fileData => {
+        mediaFiles = fileData.filter(file => file !== null);
+        
+        populateFileList();
+        
+        // Get stats once and use for both update and logging
+        const stats = calculateMediaStats();
+        updateStats();
+        logActivity(`📁 Loaded ${stats.totalFiles} files (${stats.imageCount} images, ${stats.videoCount} videos)`, 'info');
+
+        // Trigger auto-matching if GPX is present
+        if (gpxTrack) {
+            logActivity(`🎯 GPX track detected - triggering auto-matching for ${stats.totalFiles} files`, 'info');
+        }
+        runAutoMatchingIfReady();
+        
+        // Refresh map view to show updated markers
+        refreshMapView();
+    });
+}
+
+// Handle GPX file drop
+function handleGpxDrop(e) {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const gpxText = e.target.result;
+            const gpxData = parseGpx(gpxText);
+            
+            if (gpxData.tracks.length > 0) {
+                gpxTrack = gpxData;
+                displayGpxTrack(gpxData);
+                
+                // Auto-assign coordinates based on timestamp matching
+                autoAssignCoordinatesFromGpx(gpxData);
+                
+                // Refresh map view to show updated markers
+                refreshMapView();
+                
+                // Show feedback with more detailed info
+                const trackName = gpxData.tracks[0].name || 'Unnamed track';
+                logActivity(`🗺️ GPX track loaded: ${trackName} (${gpxData.tracks[0].points.length} points)`, 'info');
+                
+                // Debug: Show first and last timestamps from GPX (string-based to avoid timezone shifts)
+                const pointsWithTime = gpxData.tracks[0].points.filter(p => p.time);
+                if (pointsWithTime.length > 0) {
+                    const firstIso = pointsWithTime[0].time;
+                    const lastIso = pointsWithTime[pointsWithTime.length - 1].time;
+                    const firstStr = isoToWallString(firstIso);
+                    const lastStr = isoToWallString(lastIso);
+                    const sameDay = firstStr.split(' ')[0] === lastStr.split(' ')[0];
+                    const timeRangeStr = sameDay ? `${firstStr} - ${lastStr.split(' ')[1]}` : `${firstStr} - ${lastStr}`;
+                    logActivity(`⏰ Track time range: ${timeRangeStr}`, 'info');
+                }
+            } else {
+                throw new Error('No tracks found in GPX file');
+            }
+        } catch (error) {
+            logActivity(`❌ Error loading GPX file: ${error.message}`, 'warning');
+        }
+    };
+    
+    reader.readAsText(file);
+}
+
 // Initialize when map loads
-map.on('load', initApp); 
+map.on('load', initApp);
+
+// Capture map screenshot using Mapbox's native canvas
+async function captureMapScreenshot() {
+    try {
+        // First fit bounds to show all content
+        const bounds = computeCombinedBounds();
+        if (bounds) {
+            map.fitBounds(bounds, { padding: 50, duration: 1000 });
+            
+            // Wait for the map to finish moving
+            await new Promise(resolve => {
+                map.once('moveend', resolve);
+            });
+            
+            // Wait a bit more for tiles to load
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Create a static map image using Mapbox Static API
+        if (bounds) {
+            // Use reasonable dimensions (Mapbox has limits)
+            const width = Math.min(1200, map.getCanvas().width);
+            const height = Math.min(800, map.getCanvas().height);
+            
+            // Build aspect-corrected bounds using Web Mercator to avoid stretching
+            const buffer = 0.001; // small degree buffer (~100m)
+            const degBounds = {
+                west: bounds.getWest() - buffer,
+                south: bounds.getSouth() - buffer,
+                east: bounds.getEast() + buffer,
+                north: bounds.getNorth() + buffer
+            };
+
+            // Mercator helpers in normalized [0,1] tile space
+            const lonToX = (lon) => (lon + 180) / 360;
+            const latToY = (lat) => {
+                const a = Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2);
+                const y = (1 - Math.log(a) / Math.PI) / 2;
+                return Math.min(1, Math.max(0, y));
+            };
+            const xToLon = (x) => x * 360 - 180;
+            const yToLat = (y) => {
+                const n = Math.PI * (1 - 2 * y);
+                return (180 / Math.PI) * Math.atan(Math.sinh(n));
+            };
+
+            const xW = lonToX(degBounds.west);
+            const xE = lonToX(degBounds.east);
+            const yN = latToY(degBounds.north);
+            const yS = latToY(degBounds.south);
+            let dx = xE - xW;
+            let dy = yS - yN; // y increases downward
+            const imgAspect = (width * 2) / (height * 2);
+            const boxAspect = dx / dy;
+            let effXW = xW, effXE = xE, effYN = yN, effYS = yS;
+            if (isFinite(dx) && isFinite(dy) && dx > 0 && dy > 0) {
+                if (boxAspect > imgAspect) {
+                    // too wide -> expand vertical span
+                    const cy = (yN + yS) / 2;
+                    const dyEff = dx / imgAspect;
+                    effYN = cy - dyEff / 2;
+                    effYS = cy + dyEff / 2;
+                } else if (boxAspect < imgAspect) {
+                    // too tall -> expand horizontal span
+                    const cx = (xW + xE) / 2;
+                    const dxEff = dy * imgAspect;
+                    effXW = cx - dxEff / 2;
+                    effXE = cx + dxEff / 2;
+                }
+            }
+            const staticBounds = {
+                west: xToLon(effXW),
+                south: yToLat(effYS),
+                east: xToLon(effXE),
+                north: yToLat(effYN)
+            };
+            
+            // Build static map URL using computed bounds with buffer
+            const staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/` +
+                `[${staticBounds.west},${staticBounds.south},${staticBounds.east},${staticBounds.north}]` +
+                `/${width}x${height}@2x` +
+                `?access_token=${mapboxgl.accessToken}`;
+
+            
+
+            // Fetch the base static map image
+            const response = await fetch(staticMapUrl);
+            if (response.ok) {
+                const baseMapBlob = await response.blob();
+                
+                // Draw the base map first to get actual dimensions
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = URL.createObjectURL(baseMapBlob);
+                });
+                
+                // Use the ACTUAL image dimensions for coordinate conversion
+                const actualWidth = img.width;
+                const actualHeight = img.height;
+                
+                // Create a NEW canvas with the correct dimensions (don't resize existing one)
+                const finalCanvas = document.createElement('canvas');
+                const finalCtx = finalCanvas.getContext('2d');
+                finalCanvas.width = actualWidth;
+                finalCanvas.height = actualHeight;
+                
+                // Draw the image at full resolution on the new canvas
+                finalCtx.drawImage(img, 0, 0, actualWidth, actualHeight);
+                // (no debug overlays)
+                
+                // Draw GPX track
+                if (gpxTrack && gpxTrack.tracks && gpxTrack.tracks[0]) {
+                    const points = gpxTrack.tracks[0].points
+                        .filter(p => typeof p.lon === 'number' && typeof p.lat === 'number');
+                    
+                    if (points.length > 1) {
+                        // Use full-resolution GPX points (no simplification)
+                        const coords = points.map(p => [p.lon, p.lat]);
+                        
+                        if (coords.length > 1) {
+                            // Convert coordinates to canvas pixels using Web Mercator and effective bounds
+                            const xWm2 = (staticBounds.west + 180) / 360;
+                            const xEm2 = (staticBounds.east + 180) / 360;
+                            const yNm2 = (1 - Math.log(Math.tan(Math.PI / 4 + (staticBounds.north * Math.PI / 180) / 2)) / Math.PI) / 2;
+                            const ySm2 = (1 - Math.log(Math.tan(Math.PI / 4 + (staticBounds.south * Math.PI / 180) / 2)) / Math.PI) / 2;
+                            const pixelCoords = coords.map(coord => {
+                                const xm = (coord[0] + 180) / 360;
+                                const ym = (1 - Math.log(Math.tan(Math.PI / 4 + (coord[1] * Math.PI / 180) / 2)) / Math.PI) / 2;
+                                const x = ((xm - xWm2) / (xEm2 - xWm2)) * actualWidth;
+                                const y = ((ym - yNm2) / (ySm2 - yNm2)) * actualHeight;
+                                return [x, y];
+                            });
+                            
+                            // Draw GPX line (thin dashed)
+                            finalCtx.strokeStyle = '#ff9800';
+                            finalCtx.lineWidth = 2;
+                            finalCtx.setLineDash([4, 2]);
+                            finalCtx.beginPath();
+                            finalCtx.moveTo(pixelCoords[0][0], pixelCoords[0][1]);
+                            for (let i = 1; i < pixelCoords.length; i++) {
+                                finalCtx.lineTo(pixelCoords[i][0], pixelCoords[i][1]);
+                            }
+                            finalCtx.stroke();
+                            finalCtx.setLineDash([]);
+                        }
+                    }
+                }
+                
+                // Draw media markers
+                const imageFiles = mediaFiles.filter(f => f.type === 'image' && f.coordinates !== null);
+                
+                imageFiles.forEach((file, index) => {
+                    const coord = file.coordinates;
+                    const xm = (coord[0] + 180) / 360;
+                    const ym = (1 - Math.log(Math.tan(Math.PI / 4 + (coord[1] * Math.PI / 180) / 2)) / Math.PI) / 2;
+                    const xWm = (staticBounds.west + 180) / 360;
+                    const xEm = (staticBounds.east + 180) / 360;
+                    const yNm = (1 - Math.log(Math.tan(Math.PI / 4 + (staticBounds.north * Math.PI / 180) / 2)) / Math.PI) / 2;
+                    const ySm = (1 - Math.log(Math.tan(Math.PI / 4 + (staticBounds.south * Math.PI / 180) / 2)) / Math.PI) / 2;
+                    const x = ((xm - xWm) / (xEm - xWm)) * actualWidth;
+                    const y = ((ym - yNm) / (ySm - yNm)) * actualHeight;
+                    
+                    // Draw marker circle (2x size)
+                    finalCtx.fillStyle = '#1976d2';
+                    finalCtx.beginPath();
+                    finalCtx.arc(x, y, 16, 0, 2 * Math.PI);
+                    finalCtx.fill();
+                    
+                    // Draw white border (thicker)
+                    finalCtx.strokeStyle = '#ffffff';
+                    finalCtx.lineWidth = 4;
+                    finalCtx.stroke();
+                    
+                    // Draw number (larger)
+                    finalCtx.fillStyle = '#ffffff';
+                    finalCtx.font = 'bold 24px Arial';
+                    finalCtx.textAlign = 'center';
+                    finalCtx.textBaseline = 'middle';
+                    finalCtx.fillText((index + 1).toString(), x, y);
+                });
+                
+                // Convert final canvas to blob
+                return new Promise(resolve => {
+                    finalCanvas.toBlob(resolve, 'image/jpeg', 0.9);
+                });
+            } else {
+                console.log('Static map failed with status:', response.status);
+                const errorText = await response.text();
+                console.log('Error details:', errorText);
+                return null;
+            }
+        }
+        
+        // Fallback: return null if static map fails
+        console.log('Static map generation failed');
+        return null;
+        
+    } catch (error) {
+        console.error('Screenshot capture failed:', error);
+        return null;
+    }
+} 

@@ -1,94 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Noexif Geotagging Media</title>
-  
-  <!-- External CSS -->
-  <link rel="stylesheet" href="css/styles.css">
-  
-  <!-- Mapbox CSS -->
-  <link rel="stylesheet" type="text/css" href="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geotagging Tool - Simple Guide</title>
+    <link rel="stylesheet" href="css/home.css">
 </head>
 <body>
-  <div id="map"></div>
-  
-  <!-- Show Panel Button (appears when panel is hidden) -->
-  <button id="show-panel" class="show-panel-btn" title="Show Panel">☰</button>
-  
-  <!-- Control Panel -->
-  <div id="control-panel">
-    <div class="panel-header">
-      <h3>Noexif Geotagging Media</h3>
-      <p class="subtitle">Add Geotags to Media Files Without EXIF Data | <a href="help.html" target="_blank" style="color: #2196f3; text-decoration: none;">help</a></p>
-      <button id="hide-panel">✕</button>
-    </div>
-    
-    <div class="panel-content">
-      <!-- Search Location -->
-      <div class="search-section">
-        <h4>Search Location</h4>
-        <div id="geocoder-container"></div>
-      </div>
-      
-      <hr class="section-divider">
-      
-      <div class="mode-selector">
-        <label>
-          <input type="radio" name="mode" value="assign" checked> Assign Coordinates
-        </label>
-        <label>
-          <input type="radio" name="mode" value="view"> View Media
-        </label>
-      </div>
-      
-      <div id="assign-mode" class="mode-content">
-        <div class="file-input-container">
-          <div class="file-input-section">
-            <h4>Select Media Files</h4>
-            <input type="file" id="media-files-input" multiple accept="image/*,video/*">
-            <button id="select-files-btn" class="primary-btn">Choose Media Files</button>
-          </div>
-          
-          <div class="file-input-section">
-            <h4>Load Walking Track (GPX)</h4>
-            <input type="file" id="gpx-file-input" accept=".gpx">
-            <button id="select-gpx-btn" class="primary-btn">Choose GPX File</button>
-            <button id="clear-track-btn" class="secondary-btn" style="display: none;">Clear Track</button>
-          </div>
+    <div class="comic-container">
+        <div class="comic-header">
+            <h1>🗺️ Geotagging Tool - Simple Guide</h1>
+            <p>How to add location data to your photos in 5 easy steps</p>
         </div>
         
-        <!-- Unified Activity Log - no header, taller -->
-        <div id="unified-activity-log" class="unified-log"></div>
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">1</span>
+                Upload Your Photos
+            </div>
+            <div class="step-content">
+                <div class="step-text">
+                    Select photos from your camera or phone. The tool reads the date/time from your filename to know when each photo was taken.
+                </div>
+                <div class="highlight"><strong>Prerequisite:</strong> Filenames must include ISO-8601 date/time or a common camera timestamp, e.g. <code>2025-08-04T13:27Z</code>, <code>20250804_132744</code>.</div>
+                <div class="step-icon">📸</div>
+            </div>
+        </div>
         
-        <div id="file-list" title="Select media files & click on the map to set coordinates (and elevation if available from GPX track points)">
-          <!-- File list will be populated here -->
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">2</span>
+                Upload Your GPS Track
+            </div>
+            <div class="step-content">
+                <div class="step-text">
+                    Upload a GPX file from your GPS device, phone app, or fitness tracker. This contains your route with timestamps and coordinates.
+                </div>
+                <div class="step-icon">📡</div>
+            </div>
         </div>
-      </div>
-      
-      <div id="view-mode" class="mode-content">
-        <button id="download-all-btn" class="primary-btn download-btn">Download All Noexif Geotagging Media Photos</button>
-        <div id="media-stats">
-          <p>Total files: <span id="total-count">0</span> | With coordinates: <span id="coord-count">0</span> | With elevation: <span id="elevation-count">0</span></p>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">3</span>
+                Automatic Matching
+            </div>
+            <div class="step-content">
+                <div class="step-text">
+                    The tool automatically matches your photos to GPS points based on time. If a photo was taken at 2:30 PM, it finds the GPS location from 2:30 PM in your track.
+                </div>
+                <div class="step-icon">⚡</div>
+            </div>
         </div>
-      </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">4</span>
+                Manual Adjustments (if needed)
+            </div>
+            <div class="step-content">
+                <div class="step-text">
+                    For photos that don't match automatically, click on the map to manually set their location. The tool also finds elevation data from nearby GPS points.
+                </div>
+                <div class="step-icon">🎯</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-title">
+                <span class="step-number">5</span>
+                Download Geotagged Photos
+            </div>
+            <div class="step-content">
+                <div class="step-text">
+                    Download all your photos with coordinates embedded in the filename. No EXIF data needed - the location info is permanently part of the filename!
+                </div>
+                <div class="step-icon">📥</div>
+            </div>
+        </div>
+        
+        <div class="highlight">
+            <strong>🎉 That's it!</strong> Your photos now have location data that will never get lost, even when shared on social media or stored in the cloud. The coordinates are part of the filename, so they're always preserved.
+        </div>
+        
+        <button class="play-button" onclick="window.open('maptool.html', '_blank')">
+            🚀 Try It Now
+        </button>
     </div>
-  </div>
-
-  <!-- Mapbox JS -->
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.14.0/mapbox-gl.js"></script>
-  
-  <!-- Mapbox Geocoder -->
-  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
-  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
-  
-
-  
-  <!-- JSZip for bulk download -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  
-  <!-- External JavaScript -->
-  <script src="js/map.js"></script>
 </body>
-</html> 
+</html>
