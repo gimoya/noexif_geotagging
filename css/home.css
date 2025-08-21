@@ -72,6 +72,7 @@ body {
     display: flex;
     align-items: center;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
 .step-text {
@@ -91,6 +92,13 @@ body {
     border-radius: 8px;
     border-left: 4px solid #28a745;
     margin-top: 15px;
+}
+
+/* Ensure prerequisite highlight under step content spans full width */
+.step-content .highlight {
+    flex-basis: 100%;
+    width: 100%;
+    order: 3;
 }
 
 .highlight strong {

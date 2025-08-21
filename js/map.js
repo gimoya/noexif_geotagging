@@ -171,6 +171,16 @@ function getWallTimeStringFromFilename(filename) {
 
 // Select a file for coordinate assignment
 function selectFile(index) {
+    // Toggle selection if clicking the same item again
+    if (selectedFileIndex === index) {
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        selectedFileIndex = -1;
+        updateMapCursor();
+        return;
+    }
+    
     // Remove previous selection
     document.querySelectorAll('.file-item').forEach(item => {
         item.classList.remove('selected');
@@ -179,6 +189,7 @@ function selectFile(index) {
     // Add selection to clicked item
     document.querySelector(`[data-index="${index}"]`).classList.add('selected');
     selectedFileIndex = index;
+    updateMapCursor();
     
     // Update coordinate display in the log instead of separate div
     const file = mediaFiles[index];
@@ -197,7 +208,7 @@ function toggleMode() {
     if (currentMode === 'assign') {
         assignMode.style.display = 'block';
         viewMode.style.display = 'none';
-        map.getCanvas().style.cursor = 'crosshair';
+        updateMapCursor();
         
         // Assign mode: show position markers (normal pins), hide media pins
         showPositionMarkers();
@@ -205,7 +216,7 @@ function toggleMode() {
     } else {
         assignMode.style.display = 'none';
         viewMode.style.display = 'block';
-        map.getCanvas().style.cursor = 'grab';
+        updateMapCursor();
         
         // View mode: show media pins, hide position markers
         showMediaPins();
@@ -213,6 +224,19 @@ function toggleMode() {
         
         // Update stats when switching to view mode to ensure they're current
         updateStats();
+    }
+}
+
+// Update map cursor based on mode and selection state
+function updateMapCursor() {
+    if (currentMode === 'assign') {
+        if (selectedFileIndex >= 0) {
+            map.getCanvas().style.cursor = 'crosshair';
+        } else {
+            map.getCanvas().style.cursor = 'default';
+        }
+    } else {
+        map.getCanvas().style.cursor = 'grab';
     }
 }
 
