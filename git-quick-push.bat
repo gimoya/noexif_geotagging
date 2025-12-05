@@ -24,12 +24,27 @@ if errorlevel 1 (
 
 echo.
 echo Detecting current branch...
-for /f "tokens=*" %%i in ('git branch --show-current') do set "BRANCH=%%i"
-if "%BRANCH%"=="" (
-  echo WARNING: Could not detect branch, defaulting to master
-  set "BRANCH=master"
-) else (
-  echo Current branch: %BRANCH%
+for /f "tokens=*" %%i in ('git branch --show-current') do set "CURRENT_BRANCH=%%i"
+if "%CURRENT_BRANCH%"=="" (
+  echo WARNING: Could not detect branch
+  set "CURRENT_BRANCH=unknown"
+)
+
+echo Current branch: %CURRENT_BRANCH%
+
+REM Push to main branch
+set "BRANCH=main"
+
+REM If not on main, switch to main first
+if /i not "%CURRENT_BRANCH%"=="main" (
+  echo.
+  echo Switching to main branch...
+  git checkout main
+  if errorlevel 1 (
+    echo ERROR: Failed to switch to main branch!
+    pause
+    exit /b 1
+  )
 )
 
 echo.
