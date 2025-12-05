@@ -120,13 +120,29 @@ body {
     color: #333;
 }
 
+.search-timezone-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.search-half {
+    flex: 1;
+    min-width: 0;
+}
+
+.timezone-half {
+    flex: 1;
+    min-width: 0;
+}
+
 #geocoder-container {
     width: 100%;
     display: flex;
     justify-content: stretch;
 }
 
-/* Ensure geocoder spans full width */
+/* Ensure geocoder spans full width of its container */
 #geocoder-container .mapboxgl-ctrl-geocoder {
     flex: 1;
     width: 100% !important;

@@ -26,9 +26,42 @@
     </div>
     
     <div class="panel-content">
-      <!-- Search Location -->
+      <!-- Search Location and Timezone -->
       <div class="search-section">
-        <div id="geocoder-container"></div>
+        <div class="search-timezone-row">
+          <div id="geocoder-container" class="search-half"></div>
+          <div class="timezone-half">
+            <label for="gpx-timezone" style="display: block; margin-bottom: 4px; font-size: 12px; color: #666;">GPX Timezone:</label>
+            <select id="gpx-timezone" style="width: 100%; padding: 4px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px;">
+              <option value="0">UTC - London (winter), Lisbon</option>
+              <option value="60">UTC+01:00 - Berlin (winter), Paris (winter), Rome (winter), Vienna (winter), Amsterdam (winter)</option>
+              <option value="120" selected>UTC+02:00 - Berlin (summer), Paris (summer), Rome (summer), Vienna (summer), Amsterdam (summer), Athens, Helsinki, Cairo</option>
+              <option value="180">UTC+03:00 - Moscow, Istanbul, Nairobi, Riyadh</option>
+              <option value="240">UTC+04:00 - Dubai, Baku, Tbilisi</option>
+              <option value="300">UTC+05:00 - Karachi, Islamabad, Tashkent</option>
+              <option value="360">UTC+06:00 - Dhaka, Almaty, Omsk</option>
+              <option value="420">UTC+07:00 - Bangkok, Jakarta, Hanoi, Bangkok</option>
+              <option value="480">UTC+08:00 - Beijing, Singapore, Manila, Perth, Taipei</option>
+              <option value="540">UTC+09:00 - Tokyo, Seoul, Seoul</option>
+              <option value="600">UTC+10:00 - Sydney (winter), Melbourne (winter), Port Moresby</option>
+              <option value="660">UTC+11:00 - Sydney (summer), Melbourne (summer), Nouméa</option>
+              <option value="720">UTC+12:00 - Auckland (winter), Fiji</option>
+              <option value="780">UTC+13:00 - Auckland (summer)</option>
+              <option value="-60">UTC-01:00 - Azores, Cape Verde</option>
+              <option value="-120">UTC-02:00 - Mid-Atlantic</option>
+              <option value="-180">UTC-03:00 - Buenos Aires, São Paulo, Montevideo</option>
+              <option value="-240">UTC-04:00 - Caracas, La Paz, Santiago (winter)</option>
+              <option value="-300">UTC-05:00 - New York (winter), Toronto (winter), Bogotá, Lima</option>
+              <option value="-360">UTC-06:00 - Chicago (winter), Mexico City, Guatemala</option>
+              <option value="-420">UTC-07:00 - Denver (winter), Phoenix, Los Angeles (winter)</option>
+              <option value="-480">UTC-08:00 - Los Angeles (winter), Vancouver (winter), Seattle (winter)</option>
+              <option value="-540">UTC-09:00 - Anchorage (winter)</option>
+              <option value="-600">UTC-10:00 - Honolulu</option>
+              <option value="-660">UTC-11:00 - Midway Island</option>
+              <option value="-720">UTC-12:00 - Baker Island</option>
+            </select>
+          </div>
+        </div>
       </div>
       
       <hr class="section-divider">

@@ -24,6 +24,7 @@ let currentMode = 'assign';
 let mediaMarkers = [];
 let positionMarkers = []; // Store position markers for each file
 let gpxTrack = null; // Store GPX track data
+let gpxTimezoneOffsetMinutes = 120; // Default: UTC+02:00 (CEST) in minutes
 
 // Timezone offset constants (in milliseconds)
 const CEST_OFFSET_MS = 2 * 60 * 60 * 1000; // +2 hours for CEST
@@ -260,6 +261,20 @@ function setupEventListeners() {
     // File input change handlers (keep existing functionality)
     document.getElementById('media-files-input').addEventListener('change', handleFileSelection);
     document.getElementById('gpx-file-input').addEventListener('change', handleGpxSelection);
+    
+    // GPX timezone selector
+    const gpxTimezoneSelect = document.getElementById('gpx-timezone');
+    if (gpxTimezoneSelect) {
+        gpxTimezoneSelect.addEventListener('change', function() {
+            gpxTimezoneOffsetMinutes = parseInt(this.value, 10);
+            logActivity(`🌍 GPX timezone set to UTC${gpxTimezoneOffsetMinutes >= 0 ? '+' : ''}${(gpxTimezoneOffsetMinutes / 60).toFixed(0).padStart(2, '0')}:${Math.abs(gpxTimezoneOffsetMinutes % 60).toString().padStart(2, '0')}`, 'info');
+            // Re-run matching if GPX track is loaded
+            if (gpxTrack) {
+                logActivity('🔄 Re-matching photos with updated timezone...', 'info');
+                autoAssignCoordinatesFromGpx(gpxTrack);
+            }
+        });
+    }
     
     // Make drop areas clickable and add drag & drop functionality
     const mediaDropArea = document.querySelector('.file-upload');
@@ -673,21 +688,15 @@ function handleFileSelection(event) {
         
         if (!isImage && !isVideo) return null;
         
-        // Parse date using shared filename date parser
+        // Parse date using shared filename date parser (ONLY filenames, no EXIF fallback)
         let dateTaken = FilenameDateParser.parse(file.name);
-        let dateSource = 'filename';
-        
-        if (!dateTaken && file.datetaken) {
-            dateTaken = new Date(file.datetaken);
-            dateSource = 'EXIF';
-        }
         
         // Log what we found or didn't find
         if (dateTaken) {
             const dateStr = dateTaken.toISOString().slice(0, 19).replace('T', ' ');
-            logActivity(`📅 ${file.name}: date found from ${dateSource} - ${dateStr}`, 'info');
+            logActivity(`📅 ${file.name}: date found from filename - ${dateStr}`, 'info');
         } else {
-            logActivity(`⚠️ ${file.name}: no date found - will be available for manual coordinate assignment only`, 'warning');
+            logActivity(`⚠️ ${file.name}: no date found in filename - will be available for manual coordinate assignment only`, 'warning');
         }
         
         const entry = {
@@ -883,6 +892,23 @@ function autoAssignCoordinatesFromGpx(gpxData) {
         return;
     }
     
+    // Debug: Show first GPX timestamp and timezone info
+    if (pointsWithTime.length > 0) {
+        const firstGpxTime = new Date(pointsWithTime[0].time);
+        const photoOffset = FilenameDateParser.DEFAULT_ASSUME_OFFSET_MINUTES;
+        const tzSign = gpxTimezoneOffsetMinutes >= 0 ? '+' : '';
+        const tzHours = Math.floor(Math.abs(gpxTimezoneOffsetMinutes) / 60);
+        const tzMinutes = Math.abs(gpxTimezoneOffsetMinutes) % 60;
+        const gpxTzStr = `UTC${tzSign}${tzHours.toString().padStart(2, '0')}:${tzMinutes.toString().padStart(2, '0')}`;
+        const photoTzStr = `UTC${photoOffset >= 0 ? '+' : ''}${(photoOffset / 60).toFixed(0).padStart(2, '0')}:${Math.abs(photoOffset % 60).toString().padStart(2, '0')}`;
+        
+        // Show conversion example
+        const gpxLocalTime = new Date(firstGpxTime.getTime() + gpxTimezoneOffsetMinutes * 60 * 1000);
+        const gpxInPhotoFormat = new Date(firstGpxTime.getTime() + gpxTimezoneOffsetMinutes * 60 * 1000 - photoOffset * 60 * 1000);
+        logActivity(`🔍 Matching: GPX ${gpxTzStr}, Photos ${photoTzStr}`, 'info');
+        logActivity(`🔍 First GPX: ${firstGpxTime.toISOString()} UTC → ${gpxLocalTime.toISOString().slice(11, 19)} local (${gpxTzStr}) → ${gpxInPhotoFormat.toISOString()} (photo format)`, 'info');
+    }
+    
     // Process each media file
     mediaFiles.forEach((mediaFile, index) => {
 
@@ -915,7 +941,14 @@ function autoAssignCoordinatesFromGpx(gpxData) {
             logActivity(`⚠️ ${mediaFile.filename}: time difference exceeds ${GPX_TIME_THRESHOLD}s threshold`, 'warning');
         } else if (result && result.reason === 'no_match') {
             const mediaDateStr = mediaFile.dateTaken.toISOString().slice(0, 19).replace('T', ' ');
-            logActivity(`ℹ️ ${mediaFile.filename}: no matching GPX track point found (media date: ${mediaDateStr})`, 'info');
+            // Debug: Show what we're looking for
+            if (pointsWithTime.length > 0) {
+                const firstGpx = new Date(pointsWithTime[0].time);
+                const lastGpx = new Date(pointsWithTime[pointsWithTime.length - 1].time);
+                logActivity(`ℹ️ ${mediaFile.filename}: no match (media: ${mediaDateStr} UTC, GPX range: ${firstGpx.toISOString().slice(0, 19)} - ${lastGpx.toISOString().slice(0, 19)} UTC)`, 'info');
+            } else {
+                logActivity(`ℹ️ ${mediaFile.filename}: no matching GPX track point found (media date: ${mediaDateStr})`, 'info');
+            }
         }
     });
     
@@ -954,32 +987,50 @@ function findClosestTrackPointByTime(mediaDate, trackPoints) {
     let closestPoint = null;
     let smallestDiff = Infinity;
     
-
+    // Convert GPX timezone offset from minutes to milliseconds
+    const gpxTimezoneOffsetMs = gpxTimezoneOffsetMinutes * 60 * 1000;
     
     trackPoints.forEach((point, index) => {
         if (!point.time) return;
         
-        const trackTime = new Date(point.time);
+        const trackTimeUTC = new Date(point.time);
         
-
+        // GPX timestamps are in UTC. Photo times are stored as UTC but represent local time.
+        // Example:
+        // - Photo filename "10:40" in UTC+2 (CEST) → stored as 08:40 UTC (10:40 - 2h)
+        // - GPX "09:40 UTC" recorded in UTC+1 (CET) → represents 10:40 local (09:40 + 1h)
+        // 
+        // To match: Convert GPX UTC to local time, then convert to photo's UTC format
+        // GPX local time = GPX UTC + gpxOffset
+        // GPX in photo format = GPX local - photoOffset = GPX UTC + gpxOffset - photoOffset
+        
+        // Get photo timezone offset (default from filename parser, in minutes)
+        const photoTimezoneOffsetMs = FilenameDateParser.DEFAULT_ASSUME_OFFSET_MINUTES * 60 * 1000;
+        
+        // Convert GPX UTC to local time (add GPX offset), then to photo's UTC format (subtract photo offset)
+        // This gives us the GPX time in the same format as photo times
+        const gpxInPhotoFormat = trackTimeUTC.getTime() + gpxTimezoneOffsetMs - photoTimezoneOffsetMs;
+        const trackTimeAdjusted = new Date(gpxInPhotoFormat);
+        
+        // Extract date components for comparison (using UTC methods since both are in UTC format)
+        const mediaYear = mediaDate.getUTCFullYear();
+        const mediaMonth = mediaDate.getUTCMonth();
+        const mediaDay = mediaDate.getUTCDate();
+        const trackYear = trackTimeAdjusted.getUTCFullYear();
+        const trackMonth = trackTimeAdjusted.getUTCMonth();
+        const trackDay = trackTimeAdjusted.getUTCDate();
         
         // Check if dates are different (different calendar days)
-        const mediaDateOnly = new Date(mediaDate.getFullYear(), mediaDate.getMonth(), mediaDate.getDate());
-        const trackDateOnly = new Date(trackTime.getUTCFullYear(), trackTime.getUTCMonth(), trackTime.getUTCDate());
-        
-        if (mediaDateOnly.getTime() !== trackDateOnly.getTime()) {
+        if (mediaYear !== trackYear || mediaMonth !== trackMonth || mediaDay !== trackDay) {
             // Different dates - exclude this point
             return;
         }
         
-        // mediaDate is now already in UTC (converted from local time in extractDateFromFilename)
-        // trackTime is already UTC from GPX
+        // Compare the times directly (both in photo's UTC format)
         const mediaTimeUTC = mediaDate.getTime();
-        const trackTimeUTC = trackTime.getTime();
+        const trackTimeAdjustedUTC = trackTimeAdjusted.getTime();
         
-        const timeDiff = Math.abs(mediaTimeUTC - trackTimeUTC);
-        
-
+        const timeDiff = Math.abs(mediaTimeUTC - trackTimeAdjustedUTC);
         
         if (timeDiff < smallestDiff) {
             smallestDiff = timeDiff;
@@ -1318,21 +1369,15 @@ function handleMediaDrop(e) {
         
         if (!isImage && !isVideo) return null;
         
-        // Keep date extraction for GPX auto-assignment, but don't rely on it for sorting
+        // Parse date from filename ONLY (no EXIF fallback)
         let dateTaken = FilenameDateParser.parse(file.name);
-        let dateSource = 'filename';
-        
-        if (!dateTaken && file.datetaken) {
-            dateTaken = new Date(file.datetaken);
-            dateSource = 'EXIF';
-        }
         
         // Log what we found or didn't find
         if (dateTaken) {
             const dateStr = dateTaken.toISOString().slice(0, 19).replace('T', ' ');
-            logActivity(`📅 ${file.name}: date found from ${dateSource} - ${dateStr}`, 'info');
+            logActivity(`📅 ${file.name}: date found from filename - ${dateStr}`, 'info');
         } else {
-            logActivity(`⚠️ ${file.name}: no date found - will be available for manual coordinate assignment only`, 'warning');
+            logActivity(`⚠️ ${file.name}: no date found in filename - will be available for manual coordinate assignment only`, 'warning');
         }
         
         const entry = {
