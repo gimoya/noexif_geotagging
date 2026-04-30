@@ -111,7 +111,10 @@ html {
 .panel-content {
     padding: 10px 20px; /* Match header horizontal padding (20px) */
     height: calc(100vh - 53px); /* Adjusted from 60px due to reduced header padding */
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -257,6 +260,16 @@ html {
 
 .mode-content {
     margin-top: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+#assign-mode {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
 #view-mode {
@@ -264,7 +277,9 @@ html {
 }
 
 #file-list {
-    max-height: calc(100vh - 350px);
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     border: 1px solid #e9ecef;
     border-radius: 4px;
@@ -293,7 +308,7 @@ html {
 .file-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     padding: 8px 15px; /* Reduced from 10px to 8px */
     border-bottom: 1px solid #f1f3f4;
     cursor: pointer;
@@ -377,6 +392,31 @@ html {
     padding: 2px 6px;
     border-radius: 3px;
     font-weight: 500;
+}
+
+.file-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.file-delete-btn {
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    color: #666;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.file-delete-btn:hover {
+    border-color: #d32f2f;
+    color: #d32f2f;
+    background: #fff5f5;
 }
 
 .coordinate-status.has-coords {
@@ -515,6 +555,8 @@ html {
 
 /* Unified Activity Log - no header, taller */
 .unified-log {
+    flex: 0 0 auto;
+    min-height: 7em;
     max-height: 7em; 
     overflow-y: auto;
     background: #f8f9fa;
@@ -558,22 +600,37 @@ html {
     color: #dc3545;
 }
 
-/* Custom scrollbar for the unified log */
-.unified-log::-webkit-scrollbar {
+/* Unified scrollbar style (same as activity log) */
+#file-list,
+.unified-log,
+.mapboxgl-ctrl-geocoder .suggestions {
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+#file-list::-webkit-scrollbar,
+.unified-log::-webkit-scrollbar,
+.mapboxgl-ctrl-geocoder .suggestions::-webkit-scrollbar {
     width: 4px; /* Thinner scrollbar to save space */
 }
 
-.unified-log::-webkit-scrollbar-track {
+#file-list::-webkit-scrollbar-track,
+.unified-log::-webkit-scrollbar-track,
+.mapboxgl-ctrl-geocoder .suggestions::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 2px;
 }
 
-.unified-log::-webkit-scrollbar-thumb {
+#file-list::-webkit-scrollbar-thumb,
+.unified-log::-webkit-scrollbar-thumb,
+.mapboxgl-ctrl-geocoder .suggestions::-webkit-scrollbar-thumb {
     background: #c1c1c1;
     border-radius: 2px;
 }
 
-.unified-log::-webkit-scrollbar-thumb:hover {
+#file-list::-webkit-scrollbar-thumb:hover,
+.unified-log::-webkit-scrollbar-thumb:hover,
+.mapboxgl-ctrl-geocoder .suggestions::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
 

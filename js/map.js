@@ -1,6 +1,6 @@
 
 
-// Mapbox access token
+// Optional Mapbox token (used by Mapbox-specific features like geocoder/static API).
 mapboxgl.accessToken = 'pk.eyJ1IjoiZ2ltb3lhIiwiYSI6IkZrTld6NmcifQ.eY6Ymt2kVLvPQ6A2Dt9zAQ';
 
 // Configurable thresholds and constants
@@ -10,10 +10,30 @@ const ELEVATION_DISTANCE_THRESHOLD = 5; // 5 meters, for elevation lookup from G
 // Media files will be loaded dynamically from the file input
 let mediaFiles = [];
 
-// Initialize map with satellite streets style
+// API-key-free hybrid-like basemap (imagery + reference labels)
 const map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    style: {
+        version: 8,
+        sources: {
+            esriImagery: {
+                type: 'raster',
+                tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                tileSize: 256,
+                attribution: 'Tiles © Esri'
+            },
+            esriReferenceLabels: {
+                type: 'raster',
+                tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
+                tileSize: 256,
+                attribution: 'Labels © Esri'
+            }
+        },
+        layers: [
+            { id: 'esri-imagery-layer', type: 'raster', source: 'esriImagery' },
+            { id: 'esri-reference-labels-layer', type: 'raster', source: 'esriReferenceLabels' }
+        ]
+    },
     center: [13.8, 47.6], // Center of Austria
     zoom: 8
 });
@@ -99,6 +119,14 @@ function runAutoMatchingIfReady() {
     }
 }
 
+// Sort media files by parsed filename date/time (oldest first), then by filename.
+function sortMediaFilesByDateTaken(a, b) {
+    if (a.dateTaken && b.dateTaken) return a.dateTaken - b.dateTaken;
+    if (a.dateTaken && !b.dateTaken) return -1;
+    if (!a.dateTaken && b.dateTaken) return 1;
+    return a.filename.localeCompare(b.filename);
+}
+
 
 
 // Populate the file list in the control panel
@@ -127,10 +155,18 @@ function populateFileList() {
                     <div class="file-type">${file.type} • ${dateStr}</div>
                 </div>
             </div>
-            <div class="coordinate-status ${statusClass}">${statusText}</div>
+            <div class="file-actions">
+                <div class="coordinate-status ${statusClass}">${statusText}</div>
+                <button class="file-delete-btn" type="button" title="Delete file from list">Delete</button>
+            </div>
         `;
         
         fileItem.addEventListener('click', () => selectFile(index));
+        const deleteBtn = fileItem.querySelector('.file-delete-btn');
+        deleteBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            deleteMediaFile(index);
+        });
         fileList.appendChild(fileItem);
     });
 }
@@ -195,10 +231,65 @@ function selectFile(index) {
     // Update coordinate display in the log instead of separate div
     const file = mediaFiles[index];
     if (file.coordinates) {
+        if (currentMode === 'assign') {
+            const centerOffset = getVisibleMapCenterOffset();
+            map.easeTo({
+                center: file.coordinates,
+                offset: centerOffset,
+                duration: 700
+            });
+        }
         logActivity(` Selected: ${file.filename} - Coordinates: ___${file.coordinates[0].toFixed(6)}, ${file.coordinates[1].toFixed(6)}___`, 'info');
     } else {
         logActivity(` Selected: ${file.filename} - No coordinates assigned yet`, 'info');
     }
+}
+
+// Delete one media file from the current list and refresh related UI/map state.
+function deleteMediaFile(index) {
+    const file = mediaFiles[index];
+    if (!file) return;
+
+    // Remove stale map markers immediately before reindexing files.
+    hideMediaPins();
+    hidePositionMarkers();
+
+    if (typeof file.path === 'string' && file.path.startsWith('blob:')) {
+        URL.revokeObjectURL(file.path);
+    }
+
+    mediaFiles.splice(index, 1);
+
+    if (selectedFileIndex === index) {
+        selectedFileIndex = -1;
+    } else if (selectedFileIndex > index) {
+        selectedFileIndex -= 1;
+    }
+
+    populateFileList();
+    updateStats();
+    refreshMapView();
+    updateMapCursor();
+    logActivity(`🗑️ Removed file: ${file.filename}`, 'info');
+}
+
+// Shift map target into the visible map area when the left panel overlays the map.
+function getVisibleMapCenterOffset() {
+    const panel = document.getElementById('control-panel');
+    const mapEl = document.getElementById('map');
+    if (!panel || !mapEl) return [0, 0];
+
+    const panelRect = panel.getBoundingClientRect();
+    const mapRect = mapEl.getBoundingClientRect();
+
+    // Count only overlay that actually covers the left edge of the map.
+    let leftOverlayWidth = 0;
+    if (panelRect.left <= mapRect.left) {
+        const overlayRight = Math.min(panelRect.right, mapRect.right);
+        leftOverlayWidth = Math.max(0, overlayRight - mapRect.left);
+    }
+
+    return [leftOverlayWidth / 2, 0];
 }
 
 // Toggle between assign and view modes
@@ -207,7 +298,7 @@ function toggleMode() {
     const viewMode = document.getElementById('view-mode');
     
     if (currentMode === 'assign') {
-        assignMode.style.display = 'block';
+        assignMode.style.display = 'flex';
         viewMode.style.display = 'none';
         updateMapCursor();
         
@@ -711,7 +802,9 @@ function handleFileSelection(event) {
         };
         return entry;
     })).then(fileData => {
-        mediaFiles = fileData.filter(file => file !== null);
+        mediaFiles = fileData
+            .filter(file => file !== null)
+            .sort(sortMediaFilesByDateTaken);
         
         populateFileList();
         
@@ -1392,7 +1485,9 @@ function handleMediaDrop(e) {
         };
         return entry;
     })).then(fileData => {
-        mediaFiles = fileData.filter(file => file !== null);
+        mediaFiles = fileData
+            .filter(file => file !== null)
+            .sort(sortMediaFilesByDateTaken);
         
         populateFileList();
         
