@@ -142,7 +142,7 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    Select photos from your camera or phone. The tool reads the date/time from your filename to know when each photo was taken.
+                    Select photos from your camera or phone. If EXIF GPS exists, those coordinates are used. If not, the tool uses the noexif path: date/time from the filename for later GPX matching or manual placement.
                 </div>
                 <div class="step-icon">📸</div>
             </div>
@@ -168,7 +168,7 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    The tool automatically matches your photos to GPS points based on time. If a photo was taken at 2:30 PM, it finds the GPS location from 2:30 PM in your track.
+                    Photos without EXIF GPS are matched to GPX points by filename time. If a photo was taken at 2:30 PM, it finds the GPS location from 2:30 PM in your track. EXIF GPS coords are kept and not overwritten.
                 </div>
                 <div class="step-icon">⚡</div>
             </div>
@@ -194,7 +194,7 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    Download all your photos with coordinates embedded in the filename. No EXIF data needed - the location info is permanently part of the filename!
+                    Download all your photos with coordinates embedded in the filename. Location survives even when EXIF is stripped — the coords are permanently part of the filename.
                 </div>
                 <div class="step-icon">📥</div>
             </div>

@@ -20,9 +20,9 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    Upload files from your camera or phone. The tool extracts date/time from filenames.
+                    Upload files from your camera or phone. If a photo already has EXIF GPS, those coordinates are used immediately. Otherwise the tool falls back to the noexif path: date/time from the filename, then GPX matching or manual pin.
                 </div>
-                <div class="highlight"><strong>Prerequisite:</strong> Filenames must include ISO-8601 date/time or a common camera timestamp, e.g. <code>2025-08-04T13:27Z</code>, <code>20250804_132744</code>.</div>
+                <div class="highlight"><strong>Noexif prerequisite:</strong> When EXIF GPS is missing, filenames must include ISO-8601 date/time or a common camera timestamp, e.g. <code>2025-08-04T13:27Z</code>, <code>20250804_132744</code>, <code>PXL_20230320_162237500</code>.</div>
                 <div class="step-icon">📸</div>
             </div>
         </div>
@@ -47,7 +47,7 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    The tool automatically matches your photos to GPS points based on time. If a photo was taken at 2:30 PM, it finds the GPS location from 2:30 PM in your track.<br> 
+                    Photos without EXIF GPS are matched to GPX points by filename time. If a photo was taken at 2:30 PM, it finds the GPS location from 2:30 PM in your track. Files that already had EXIF GPS are left as-is.<br>
                     You can preview the matched media in the 'media viewer' tab.
                 </div>
                 <div class="step-icon">⚡</div>
@@ -74,7 +74,7 @@
             </div>
             <div class="step-content">
                 <div class="step-text">
-                    Download all your photos (images only) with coordinates (and elevation if available) embedded in the filename. No EXIF data needed! The ZIP also includes a map overview image:)
+                    Download all your photos (images only) with coordinates (and elevation if available) embedded in the filename — so location survives even when EXIF is stripped. The ZIP also includes a map overview image.
                 </div>
                 <div class="step-icon">📥</div>
             </div>
