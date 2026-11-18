@@ -86,11 +86,44 @@ const STYLE_MEDIA_MARKER = {
 };
 
 const STYLE_POSITION_MARKER = {
-    boxSizePx: 24,
-    fontSizePx: 18,
-    emoji: '✖',
+    boxSizePx: 12,
+    armPx: 4.5,       // half-diagonal of the X
+    strokePx: 1.25,   // thin stroke
     color: '#ffffff'
 };
+
+function createPositionCrossEl() {
+    const size = STYLE_POSITION_MARKER.boxSizePx;
+    const stroke = STYLE_POSITION_MARKER.strokePx;
+    const el = document.createElement('div');
+    el.className = 'position-marker';
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.cursor = 'pointer';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.innerHTML =
+        `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+        `<line x1="2" y1="2" x2="${size - 2}" y2="${size - 2}" stroke="${STYLE_POSITION_MARKER.color}" stroke-width="${stroke}" stroke-linecap="round"/>` +
+        `<line x1="${size - 2}" y1="2" x2="2" y2="${size - 2}" stroke="${STYLE_POSITION_MARKER.color}" stroke-width="${stroke}" stroke-linecap="round"/>` +
+        `</svg>`;
+    return el;
+}
+
+function drawPositionCross(ctx, x, y, scale) {
+    const s = scale || 1;
+    const arm = STYLE_POSITION_MARKER.armPx * s;
+    ctx.strokeStyle = STYLE_POSITION_MARKER.color;
+    ctx.lineWidth = STYLE_POSITION_MARKER.strokePx * s;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - arm, y - arm);
+    ctx.lineTo(x + arm, y + arm);
+    ctx.moveTo(x + arm, y - arm);
+    ctx.lineTo(x - arm, y + arm);
+    ctx.stroke();
+}
 
 function emptyFeatureCollection() {
     return { type: 'FeatureCollection', features: [] };
@@ -293,9 +326,7 @@ function populateFileList() {
         
         // Display wall-time string derived directly from filename (no Date objects)
         let dateStr = getWallTimeStringFromFilename(file.filename) || 'Unknown date';
-        const timeDiffLabel = (file.coordSource !== 'manual' && file.timeDiffSeconds != null)
-            ? ` • time-diff ${formatTimeDiffMmSs(file.timeDiffSeconds)}`
-            : '';
+        const timeDiffLabel = getTimeDiffLabel(file);
         
         fileItem.innerHTML = `
             <div class="file-info">
@@ -563,6 +594,7 @@ function handleMapClick(e) {
         mediaFiles[selectedFileIndex].coordinates = coords;
         mediaFiles[selectedFileIndex].coordSource = 'manual';
         mediaFiles[selectedFileIndex].timeDiffSeconds = null;
+        mediaFiles[selectedFileIndex].timeDiffReason = null;
         
         // Try to find elevation from nearest GPX track point
         const elevationResult = findNearestGpxElevation(coords, ELEVATION_DISTANCE_THRESHOLD);
@@ -625,17 +657,8 @@ function updatePositionMarker(fileIndex, coords) {
         positionMarkers[fileIndex].remove();
     }
     
-    // Create new position marker
-    const markerEl = document.createElement('div');
-    markerEl.className = 'position-marker';
-    markerEl.style.width = STYLE_POSITION_MARKER.boxSizePx + 'px';
-    markerEl.style.height = STYLE_POSITION_MARKER.boxSizePx + 'px';
-    markerEl.style.cursor = 'pointer';
-    markerEl.style.fontSize = STYLE_POSITION_MARKER.fontSizePx + 'px';
-    markerEl.style.textAlign = 'center';
-    markerEl.style.lineHeight = '28.5px';
-    markerEl.textContent = STYLE_POSITION_MARKER.emoji;
-    markerEl.style.color = STYLE_POSITION_MARKER.color;
+    // Create new position marker (thin white cross)
+    const markerEl = createPositionCrossEl();
     markerEl.title = `#${fileIndex + 1} — ${mediaFiles[fileIndex].filename}`;
     
     // Create popup with file info
@@ -690,10 +713,7 @@ function updateFileStatus(index) {
     const typeElement = fileItem.querySelector('.file-type');
     if (typeElement) {
         const dateStr = getWallTimeStringFromFilename(file.filename) || 'Unknown date';
-        const timeDiffLabel = (file.coordSource !== 'manual' && file.timeDiffSeconds != null)
-            ? ` • time-diff ${formatTimeDiffMmSs(file.timeDiffSeconds)}`
-            : '';
-        typeElement.textContent = `${file.type} • ${dateStr}${timeDiffLabel}`;
+        typeElement.textContent = `${file.type} • ${dateStr}${getTimeDiffLabel(file)}`;
     }
 }
 
@@ -976,6 +996,7 @@ async function createMediaFileEntry(file) {
         elevation: elevation,
         coordSource: coordSource,
         timeDiffSeconds: null,
+        timeDiffReason: null,
         file: file,
         dateTaken: dateTaken,
         dateTakenLocal: dateTaken ? new Date(dateTaken.getTime() + CEST_OFFSET_MS) : null
@@ -988,6 +1009,23 @@ function formatTimeDiffMmSs(totalSeconds) {
     const mm = Math.floor(sec / 60);
     const ss = sec % 60;
     return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+// Thumbnail / status line: show diff or n/a + reason (skip manual)
+function getTimeDiffLabel(file) {
+    if (!file || file.coordSource === 'manual') return '';
+    if (file.timeDiffSeconds != null) {
+        return ` • time-diff ${formatTimeDiffMmSs(file.timeDiffSeconds)}`;
+    }
+    if (file.timeDiffReason) {
+        return ` • time-diff n/a (${file.timeDiffReason})`;
+    }
+    return '';
+}
+
+function setTimeDiffUnavailable(mediaFileIndex, reason) {
+    mediaFiles[mediaFileIndex].timeDiffSeconds = null;
+    mediaFiles[mediaFileIndex].timeDiffReason = reason;
 }
 
 function finalizeMediaLoad(fileData) {
@@ -1153,6 +1191,8 @@ function handleGpxSelection(event) {
                     const sameDay = firstStr.split(' ')[0] === lastStr.split(' ')[0];
                     const timeRangeStr = sameDay ? `${firstStr} - ${lastStr.split(' ')[1]}` : `${firstStr} - ${lastStr}`;
                     logActivity(`⏰ Track time range: ${timeRangeStr}`, 'info');
+                } else {
+                    logActivity(`⚠️ GPX has no timestamps (${gpxData.tracks[0].points.length} points) — time-diff and auto-assign unavailable`, 'warning');
                 }
             } else {
                 throw new Error('No tracks found in GPX file');
@@ -1184,7 +1224,14 @@ function autoAssignCoordinatesFromGpx(gpxData) {
     const pointsWithTime = trackPoints.filter(point => point.time);
     
     if (pointsWithTime.length === 0) {
-        logActivity('⚠️ GPX track has no timestamps - cannot auto-assign coordinates', 'warning');
+        const reason = 'GPX has no timestamps';
+        logActivity(`⚠️ ${reason} (${trackPoints.length} points) — cannot auto-assign or compute time-diff`, 'warning');
+        mediaFiles.forEach((mediaFile, index) => {
+            if (mediaFile.coordSource === 'manual') return;
+            setTimeDiffUnavailable(index, reason);
+            logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (${reason})`, 'info');
+        });
+        populateFileList();
         return;
     }
     
@@ -1212,7 +1259,8 @@ function autoAssignCoordinatesFromGpx(gpxData) {
         }
 
         if (!mediaFile.dateTaken) {
-            // Skip files without dates
+            setTimeDiffUnavailable(index, 'no photo timestamp in filename');
+            logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (no photo timestamp in filename)`, 'info');
             return;
         }
 
@@ -1225,44 +1273,62 @@ function autoAssignCoordinatesFromGpx(gpxData) {
             mediaFiles[index].elevation = result.point.elevation; // Store elevation if available
             mediaFiles[index].coordSource = 'gpx';
             mediaFiles[index].timeDiffSeconds = result.timeDiffSeconds;
+            mediaFiles[index].timeDiffReason = null;
             assignedCount++;
             
             const elevationInfo = result.point.elevation ? ` at ${result.point.elevation}m` : '';
             logActivity(`✖ Auto-assigned coords to ${mediaFile.filename} (time-diff ${formatTimeDiffMmSs(result.timeDiffSeconds)})${elevationInfo}`, 'success');
         } else if (result && result.reason === 'date_mismatch') {
             dateMismatchCount++;
+            setTimeDiffUnavailable(index, 'date mismatch with GPX');
             logActivity(`⚠️ ${mediaFile.filename}: date mismatch with GPX track`, 'warning');
         } else if (result && result.reason === 'time_threshold') {
             timeThresholdCount++;
+            // Still store the measured diff so thumbnail can show it
+            mediaFiles[index].timeDiffSeconds = result.timeDiffSeconds;
+            mediaFiles[index].timeDiffReason = null;
             const td = result.timeDiffSeconds != null ? ` (time-diff ${formatTimeDiffMmSs(result.timeDiffSeconds)})` : '';
             logActivity(`⚠️ ${mediaFile.filename}: time difference exceeds ${GPX_TIME_THRESHOLD}s threshold${td}`, 'warning');
         } else if (result && result.reason === 'no_match') {
+            setTimeDiffUnavailable(index, 'no same-day GPX point');
             const mediaDateStr = mediaFile.dateTaken.toISOString().slice(0, 19).replace('T', ' ');
-            // Debug: Show what we're looking for
             if (pointsWithTime.length > 0) {
                 const firstGpx = new Date(pointsWithTime[0].time);
                 const lastGpx = new Date(pointsWithTime[pointsWithTime.length - 1].time);
-                logActivity(`ℹ️ ${mediaFile.filename}: no match (media: ${mediaDateStr} UTC, GPX range: ${firstGpx.toISOString().slice(0, 19)} - ${lastGpx.toISOString().slice(0, 19)} UTC)`, 'info');
+                logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (no same-day GPX point; media: ${mediaDateStr} UTC, GPX range: ${firstGpx.toISOString().slice(0, 19)} - ${lastGpx.toISOString().slice(0, 19)} UTC)`, 'info');
             } else {
-                logActivity(`ℹ️ ${mediaFile.filename}: no matching GPX track point found (media date: ${mediaDateStr})`, 'info');
+                logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (no same-day GPX point)`, 'info');
             }
         }
     });
 
     // EXIF-placed files: attach GPX↔photo time-diff (no coordinate overwrite)
     let exifTimeDiffCount = 0;
+    let exifTimeDiffUnavailableCount = 0;
     mediaFiles.forEach((mediaFile, index) => {
-        if (mediaFile.coordSource !== 'exif' || !mediaFile.dateTaken) return;
+        if (mediaFile.coordSource !== 'exif') return;
+        if (!mediaFile.dateTaken) {
+            setTimeDiffUnavailable(index, 'no photo timestamp in filename');
+            exifTimeDiffUnavailableCount++;
+            logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (no photo timestamp in filename)`, 'info');
+            return;
+        }
         const result = findClosestTrackPointByTime(mediaFile.dateTaken, pointsWithTime);
         if (result && result.timeDiffSeconds != null) {
             mediaFiles[index].timeDiffSeconds = result.timeDiffSeconds;
+            mediaFiles[index].timeDiffReason = null;
             exifTimeDiffCount++;
             logActivity(`📍 ${mediaFile.filename}: EXIF GPS time-diff ${formatTimeDiffMmSs(result.timeDiffSeconds)}`, 'info');
+        } else {
+            const reason = (result && result.reason === 'no_match') ? 'no same-day GPX point' : 'no GPX time match';
+            setTimeDiffUnavailable(index, reason);
+            exifTimeDiffUnavailableCount++;
+            logActivity(`ℹ️ ${mediaFile.filename}: time-diff n/a (${reason})`, 'info');
         }
     });
     
     // Update UI after assignments / EXIF time-diff attach
-    if (assignedCount > 0 || exifTimeDiffCount > 0) {
+    if (assignedCount > 0 || exifTimeDiffCount > 0 || exifTimeDiffUnavailableCount > 0 || dateMismatchCount > 0 || timeThresholdCount > 0) {
         populateFileList();
         updateStats();
         
@@ -1708,6 +1774,8 @@ function handleGpxDrop(e) {
                     const sameDay = firstStr.split(' ')[0] === lastStr.split(' ')[0];
                     const timeRangeStr = sameDay ? `${firstStr} - ${lastStr.split(' ')[1]}` : `${firstStr} - ${lastStr}`;
                     logActivity(`⏰ Track time range: ${timeRangeStr}`, 'info');
+                } else {
+                    logActivity(`⚠️ GPX has no timestamps (${gpxData.tracks[0].points.length} points) — time-diff and auto-assign unavailable`, 'warning');
                 }
             } else {
                 throw new Error('No tracks found in GPX file');
@@ -1894,17 +1962,13 @@ async function captureMapScreenshot() {
                 });
 
                 const laidPins = layoutPinNrPositions(pinPoints, { scale: pxScale });
-                const pinRadius = 5 * pxScale;
                 const labelFontPx = Math.round(12 * pxScale);
 
                 laidPins.forEach((item) => {
-                    // Small monochrome pin (no outline)
-                    finalCtx.fillStyle = '#222222';
-                    finalCtx.beginPath();
-                    finalCtx.arc(item.pinX, item.pinY, pinRadius, 0, 2 * Math.PI);
-                    finalCtx.fill();
+                    // Same thin white cross as live map position markers
+                    drawPositionCross(finalCtx, item.pinX, item.pinY, pxScale);
 
-                    // Nr at collision-offset position (halo instead of big outlined circle)
+                    // Nr at collision-offset position
                     const nr = String(item.index + 1);
                     finalCtx.font = `bold ${labelFontPx}px Arial`;
                     finalCtx.textAlign = 'center';
