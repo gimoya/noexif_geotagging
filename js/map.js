@@ -179,10 +179,10 @@ function getWallTimeStringFromFilename(filename) {
         /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})[Tt_ .-]?(\d{2})[:._-]?(\d{2})(?:[:._-]?(\d{2}))?\s*(Z|[+-]\d{2}(?::?\d{2})?)/,
         // ISO-like separated
         /(\d{4})[-_.](\d{2})[-_.](\d{2})[Tt_ .-](\d{2})[:._-](\d{2})(?:[:._-](\d{2}))?\b/,
-        // Compact with seconds
-        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})\b/,
+        // Compact with seconds (optional 1–3 ms digits, e.g. PXL_…_162237500)
+        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})(?:\d{1,3})?(?!\d)/,
         // Compact without seconds
-        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})\b/,
+        /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(?!\d)/,
         // Date only
         /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})\b/
     ];
